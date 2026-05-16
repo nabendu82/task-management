@@ -80,5 +80,15 @@ export function useBoard(boardId: string) {
         }
     }
 
-    return { board, columns, loading, error }
+    async function updateBoard(boardId: string, updates: Partial<Board>) {
+        try {
+            const updatedBoard = await boardService.updateBoard(supabase!, boardId, updates);
+            setBoard(updatedBoard);
+            return updatedBoard;
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to update the board.");
+        }
+    }
+
+    return { board, columns, loading, error, updateBoard }
 }
