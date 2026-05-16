@@ -155,7 +155,7 @@ export default function DashboardPage() {
                     ) : viewMode === "grid" ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                             {boards.map((board) => (
-                                <Link key={board.id} href={`/dashboard/${board.id}`} className="block h-full">
+                                <Link key={board.id} href={`/boards/${board.id}`} className="block h-full">
                                     <Card className="hover:shadow-lg transition-shadow cursor-pointer group h-full flex flex-col">
                                         <CardHeader className="pb-3">
                                             <div className="flex items-center justify-between">
