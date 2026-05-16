@@ -2,6 +2,17 @@ import { Board, Column } from "@/lib/supabase/models";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export const boardService = {
+    async getBoard(supabase: SupabaseClient, boardId: string): Promise<Board> {
+        const { data, error } = await supabase
+            .from("boards")
+            .select("*")
+            .eq("id", boardId)
+            .single();
+
+        if (error) throw error;
+
+        return data;
+    },
     async getBoards(supabase: SupabaseClient, userId: string): Promise<Board[]> {
         const { data, error } = await supabase
             .from("boards")
@@ -52,6 +63,11 @@ export const columnService = {
 }
 
 export const boardDataService = {
+    async getBoardWithColumns(supabase: SupabaseClient, boardId: string) {
+        const [board, columns] = await Promise.all([boardService.getBoard(supabase, boardId), columnService.getColumns(supabase, boardId)]);
+        if (!board) throw new Error("Board not found");
+        return { board, columns };
+    },
     async createBoardWithDefaultColumns(supabase: SupabaseClient, boardData: {
         title: string;
         description?: string;
