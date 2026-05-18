@@ -16,6 +16,7 @@ export default function BoardPage() {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [newTitle, setNewTitle] = useState("");
     const [newColor, setNewColor] = useState("");
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     async function handleUpdateBoard(e: React.FormEvent) {
         e.preventDefault();
@@ -30,7 +31,7 @@ export default function BoardPage() {
     return (
         <>
             <div className="min-h-screen bg-gray-50">
-                <Navbar boardTitle={board?.title} onEditBoard={() => { setNewTitle(board?.title || ""); setNewColor(board?.color || ""); setIsEditingTitle(true) }} />
+                <Navbar boardTitle={board?.title} onEditBoard={() => { setNewTitle(board?.title || ""); setNewColor(board?.color || ""); setIsEditingTitle(true) }} onFilterClick={() => setIsFilterOpen(true)} filterCount={2} />
                 <Dialog open={isEditingTitle} onOpenChange={setIsEditingTitle}>
                     <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
                         <DialogHeader>
@@ -58,6 +59,46 @@ export default function BoardPage() {
                         </form>
                     </DialogContent>
                 </Dialog>
+                <Dialog open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                    <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
+                        <DialogHeader>
+                            <DialogTitle>Filter Tasks</DialogTitle>
+                            <p className="text-sm text-gray-600">
+                                Filter tasks by priority, assignee, or due date
+                            </p>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>Priority</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {["low", "medium", "high"].map((priority, key) => (
+                                        <Button key={key} size="sm" className="capitalize">{priority}</Button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Due Date</Label>
+                                <Input type="date" />
+                            </div>
+                            <div className="flex justify-between pt-4">
+                                <Button type="button" variant={"outline"}>Clear Filters</Button>
+                                <Button type="button" onClick={() => setIsFilterOpen(false)}>Apply Filters</Button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+                {/* Board Content */}
+                <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
+                    {/* Stats */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
+                        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                            <div className="text-sm text-gray-600">
+                                <span className="font-medium">Total Tasks: </span>
+                                {columns.reduce((sum, col) => sum + col.tasks.length, 0)}
+                            </div>
+                        </div>
+                    </div>
+                </main>
             </div>
         </>
     )
