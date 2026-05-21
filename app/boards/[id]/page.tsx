@@ -18,8 +18,8 @@ import { DndContext, DragEndEvent, DragOverEvent, DragOverlay, DragStartEvent, P
 import { SortableContext, useSortable, verticalListSortingStrategy, } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-function DroppableColumn({ column, children, onCreateTask, onEditColumn }:
-    { column: ColumnWithTasks; children: React.ReactNode; onCreateTask: (taskData: any) => Promise<void>; onEditColumn: (column: ColumnWithTasks) => void; }) {
+function DroppableColumn({ column, children, onCreateTask, onEditColumn, isCreateTaskOpen, onCreateTaskOpenChange }:
+    { column: ColumnWithTasks; children: React.ReactNode; onCreateTask: (taskData: any) => Promise<void>; onEditColumn: (column: ColumnWithTasks) => void; isCreateTaskOpen: boolean; onCreateTaskOpenChange: (open: boolean) => void; }) {
     const { setNodeRef, isOver } = useDroppable({ id: column.id });
     return (
         <div ref={setNodeRef} className={`w-full lg:flex-shrink-0 lg:w-80 ${isOver ? "bg-blue-50 rounded-lg" : ""}`}>
@@ -43,7 +43,7 @@ function DroppableColumn({ column, children, onCreateTask, onEditColumn }:
                 {/* column content */}
                 <div className="p-2">
                     {children}
-                    <Dialog>
+                    <Dialog open={isCreateTaskOpen} onOpenChange={onCreateTaskOpenChange}>
                         <DialogTrigger render={<Button variant="ghost" className="w-full mt-3 text-gray-500 hover:text-gray-700" />}>
                             <Plus />
                             Add Task
@@ -214,6 +214,8 @@ export default function BoardPage() {
     const [editingColumn, setEditingColumn] = useState<ColumnWithTasks | null>(null);
     const [filters, setFilters] = useState({ priority: [] as string[], assignee: [] as string[], dueDate: null as string | null, });
     const [activeTask, setActiveTask] = useState<Task | null>(null);
+    const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
+    const [createTaskColumnId, setCreateTaskColumnId] = useState<string | null>(null);
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8, }, }));
 
@@ -254,8 +256,8 @@ export default function BoardPage() {
 
         if (taskData.title.trim()) {
             await createTask(taskData);
-            const trigger = document.querySelector('[data-state="open"') as HTMLElement;
-            if (trigger) trigger.click();
+            setIsCreateTaskOpen(false);
+            setCreateTaskColumnId(null);
         }
     }
 
@@ -438,8 +440,8 @@ export default function BoardPage() {
                             </div>
                         </div>
                         {/* Add task dialog */}
-                        <Dialog>
-                            <DialogTrigger render={<Button className="w-full sm:w-auto" />}>
+                        <Dialog open={isCreateTaskOpen && createTaskColumnId === null} onOpenChange={(open) => { setIsCreateTaskOpen(open); if (!open) setCreateTaskColumnId(null); }}>
+                            <DialogTrigger render={<Button className="w-full sm:w-auto" onClick={() => { setCreateTaskColumnId(null); setIsCreateTaskOpen(true); }} />}>
                                 <Plus /> Add Task
                             </DialogTrigger>
                             <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
@@ -491,7 +493,9 @@ export default function BoardPage() {
                         <div className="flex flex-col lg:flex-row lg:space-x-6 lg:overflow-x-auto lg:pb-6 lg:px-2 lg:-mx-2 lg:[&::-webkit-scrollbar]:h-2 lg:[&::-webkit-scrollbar-track]:bg-gray-100 
                         lg:[&::-webkit-scrollbar-thumb]:bg-gray-300 lg:[&::-webkit-scrollbar-thumb]:rounded-full space-y-4 lg:space-y-0">
                             {filteredColumns.map((column, key) => (
-                                <DroppableColumn key={key} column={column} onCreateTask={handleCreateTask} onEditColumn={handleEditColumn}>
+                                <DroppableColumn key={key} column={column} onCreateTask={handleCreateTask} onEditColumn={handleEditColumn}
+                                    isCreateTaskOpen={isCreateTaskOpen && createTaskColumnId === column.id}
+                                    onCreateTaskOpenChange={(open) => { setIsCreateTaskOpen(open); if (open) setCreateTaskColumnId(column.id); else setCreateTaskColumnId(null); }}>
                                     <SortableContext items={column.tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
                                         <div className="space-y-3">
                                             {column.tasks.map((task, key) => (<SortableTask task={task} key={key} />))}
