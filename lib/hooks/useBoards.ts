@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 import { Board, Column, ColumnWithTasks } from "../supabase/models";
-import { boardDataService, boardService, taskService } from "../services";
+import { boardDataService, boardService, columnService, taskService } from "../services";
 import { useSupabase } from "../supabase/SupabaseProvider";
 
 export function useBoards() {
@@ -109,5 +109,54 @@ export function useBoard(boardId: string) {
         }
     }
 
-    return { board, columns, loading, error, updateBoard, createRealTask }
+    async function createColumn(title: string) {
+        if (!user || !board) return;
+        try {
+            const newColumn = await columnService.createColumn(supabase!, {
+                title,
+                board_id: board.id,
+                user_id: user.id,
+                sort_order: columns.length,
+            });
+            setColumns((prev) => [...prev, { ...newColumn, tasks: [] }]);
+            return newColumn;
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to create column.");
+        }
+    }
+
+    async function moveTask(taskId: string, newColumnId: string, newOrder: number) {
+        try {
+            await taskService.moveTask(supabase!, taskId, newColumnId, newOrder);
+            setColumns((prev) => {
+                const newColumns = prev.map((col) => ({ ...col, tasks: col.tasks.filter((task) => task.id !== taskId) }));
+                const task = prev.flatMap((col) => col.tasks).find((t) => t.id === taskId);
+                if (task) {
+                    return newColumns.map((col) => {
+                        if (col.id === newColumnId) {
+                            const updatedTasks = [...col.tasks];
+                            updatedTasks.splice(newOrder, 0, { ...task, column_id: newColumnId, sort_order: newOrder });
+                            return { ...col, tasks: updatedTasks };
+                        }
+                        return col;
+                    });
+                }
+                return newColumns;
+            });
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to move task.");
+        }
+    }
+
+    async function updateColumn(columnId: string, title: string) {
+        try {
+            const updatedColumn = await columnService.updateColumn(supabase!, columnId, title);
+            setColumns((prev) => prev.map((col) => col.id === columnId ? { ...col, title: updatedColumn.title } : col));
+            return updatedColumn;
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to update column.");
+        }
+    }
+
+    return { board, columns, loading, error, updateBoard, createRealTask, createColumn, setColumns, moveTask, updateColumn }
 }

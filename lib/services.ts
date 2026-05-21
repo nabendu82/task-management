@@ -70,6 +70,18 @@ export const columnService = {
         if (error) throw error;
 
         return data;
+    },
+    async updateColumn(supabase: SupabaseClient, columnId: string, title: string): Promise<Column> {
+        const { data, error } = await supabase
+            .from("columns")
+            .update({ title })
+            .eq("id", columnId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return data;
     }
 }
 
