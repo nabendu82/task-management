@@ -10,22 +10,44 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Board } from "@/lib/supabase/models";
 
 export default function DashboardPage() {
     const { user } = useUser();
     const { createBoard, boards, loading, error } = useBoards();
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+    const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
+
+    const [filters, setFilters] = useState({
+        search: "",
+        dateRange: { start: null as string | null, end: null as string | null },
+        taskCount: { min: null as number | null, max: null as number | null }
+    });
+
+    const boardsWithTaskCount = boards.map((board: Board) => ({ ...board, taskCount: 0 }));
+
+    const filteredBoards = boardsWithTaskCount.filter((board: Board) => {
+        const matchesSearch = board.title.toLowerCase().includes(filters.search.toLowerCase());
+
+        const matchesDateRange = (!filters.dateRange.start || new Date(board.created_at) >= new Date(filters.dateRange.start)) &&
+            (!filters.dateRange.end || new Date(board.created_at) <= new Date(filters.dateRange.end));
+
+        return matchesSearch && matchesDateRange;
+    });
+
+    function clearFilters() {
+        setFilters({
+            search: "",
+            dateRange: { start: null as string | null, end: null as string | null },
+            taskCount: { min: null as number | null, max: null as number | null }
+        });
+    }
 
     const handleCreateBoard = () => {
         createBoard({ title: "New Board", description: "A new board", color: "#000000" })
     }
-
-    // if (loading) {
-    //     return <div className="flex items-center justify-center h-screen">
-    //         <Loader2 className="animate-spin" size={24} />
-    //         <span className="text-gray-600">Loading your boards...</span>
-    //     </div>;
-    // }
 
     if (error) {
         return (
@@ -48,20 +70,6 @@ export default function DashboardPage() {
                     <p className="text-gray-600">
                         Here's what's happening with your boards today.
                     </p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-                    <div
-                        className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 hover:shadow-md transition-shadow cursor-pointer group"
-                        onClick={handleCreateBoard}
-                    >
-                        <div className="h-12 w-12 rounded-lg bg-indigo-50 flex items-center justify-center mb-3 group-hover:bg-indigo-100 transition-colors">
-                            <Plus className="h-6 w-6 text-indigo-600" />
-                        </div>
-                        <h3 className="font-semibold text-gray-900 mb-1">Create Board</h3>
-                        <p className="text-sm text-gray-500">
-                            Start a new project with custom columns
-                        </p>
-                    </div>
                 </div>
                 {/* Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
@@ -134,7 +142,7 @@ export default function DashboardPage() {
                                     <List />
                                 </Button>
                             </div>
-                            <Button variant="outline" size="sm">
+                            <Button variant="outline" size="sm" onClick={() => setIsFilterOpen(true)}>
                                 <Filter />
                                 Filter
                             </Button>
@@ -147,14 +155,14 @@ export default function DashboardPage() {
                     {/* Search Bar */}
                     <div className="relative mb-4 sm:mb-6">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <Input id="search" placeholder="Search boards..." className="pl-10" />
+                        <Input id="search" placeholder="Search boards..." className="pl-10" onChange={e => setFilters(prev => ({ ...prev, search: e.target.value }))} />
                     </div>
                     {/* Boards Grid/List */}
                     {boards.length === 0 ? (
                         <div>No boards yet</div>
                     ) : viewMode === "grid" ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                            {boards.map((board) => (
+                            {filteredBoards.map((board) => (
                                 <Link key={board.id} href={`/boards/${board.id}`} className="block h-full">
                                     <Card className="hover:shadow-lg transition-shadow cursor-pointer group h-full flex flex-col">
                                         <CardHeader className="pb-3">
@@ -215,6 +223,51 @@ export default function DashboardPage() {
                     )}
                 </div>
             </main>
+            {/* Filter Dialog */}
+            <Dialog open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
+                    <DialogHeader>
+                        <DialogTitle>Filter Boards</DialogTitle>
+                        <p className="text-sm text-gray-600">Filter boards by title, date, or task count.</p>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Search</Label>
+                            <Input id="search" placeholder="Search board titles..." onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Date Range</Label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div>
+                                    <Label className="text-xs">Start Date</Label>
+                                    <Input type="date" onChange={(e) => setFilters(prev => ({ ...prev, dateRange: { ...prev.dateRange, start: e.target.value || null, }, }))} />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">End Date</Label>
+                                    <Input type="date" onChange={(e) => setFilters(prev => ({ ...prev, dateRange: { ...prev.dateRange, end: e.target.value || null, }, }))} />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Task Count</Label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div>
+                                    <Label className="text-xs">Minimum</Label>
+                                    <Input type="number" min="0" placeholder="Min tasks" onChange={e => setFilters(prev => ({ ...prev, taskCount: { ...prev.taskCount, min: e.target.value ? Number(e.target.value) : null, }, }))} />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">Maximum</Label>
+                                    <Input type="number" min="0" placeholder="Max tasks" onChange={e => setFilters(prev => ({ ...prev, taskCount: { ...prev.taskCount, max: e.target.value ? Number(e.target.value) : null, }, }))} />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row justify-between pt-4 space-y-2 sm:space-y-0 sm:space-x-2">
+                            <Button variant="outline" onClick={clearFilters}>Clear Filters</Button>
+                            <Button onClick={() => setIsFilterOpen(false)}>Apply Filters</Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }   
