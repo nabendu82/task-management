@@ -54,6 +54,8 @@ export default function CalendarPage() {
     const [formColumnId, setFormColumnId] = useState<string>("");
     const [boardColumns, setBoardColumns] = useState<Column[]>([]);
     const [columnsLoading, setColumnsLoading] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
+    const [formSubmitting, setFormSubmitting] = useState(false);
     
     // Form Inputs
     const [formTitle, setFormTitle] = useState("");
@@ -225,6 +227,8 @@ export default function CalendarPage() {
         setFormDescription("");
         setFormAssignee("");
         setFormPriority("medium");
+        setFormError(null);
+        setFormSubmitting(false);
         setIsCreateOpen(true);
     };
 
@@ -233,6 +237,8 @@ export default function CalendarPage() {
         if (!formTitle.trim()) return;
         if (!formColumnId) return;
 
+        setFormSubmitting(true);
+        setFormError(null);
         try {
             await createTaskOnCalendar({
                 title: formTitle,
@@ -243,8 +249,16 @@ export default function CalendarPage() {
                 columnId: formColumnId
             });
             setIsCreateOpen(false);
-        } catch (err) {
+        } catch (err: any) {
             console.error("Task creation failed:", err);
+            const errMsg = err instanceof Error 
+                ? err.message 
+                : (err && typeof err === "object" && "message" in err)
+                    ? String(err.message)
+                    : "Failed to create task.";
+            setFormError(errMsg);
+        } finally {
+            setFormSubmitting(false);
         }
     };
 
@@ -264,7 +278,7 @@ export default function CalendarPage() {
 
     // Render single task item inside calendar slot
     const renderTaskItem = (task: Task) => {
-        const isFinished = task.is_completed;
+        const isFinished = task.is_completed ?? false;
         return (
             <div
                 key={task.id}
@@ -277,7 +291,13 @@ export default function CalendarPage() {
                 }`}
             >
                 <button
-                    onClick={() => toggleTaskCompletion(task.id, !task.is_completed)}
+                    onClick={async () => {
+                        try {
+                            await toggleTaskCompletion(task.id, !(task.is_completed ?? false));
+                        } catch (err) {
+                            console.error("Failed to toggle task completion status:", err);
+                        }
+                    }}
                     className="mt-0.5 text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
                 >
                     {isFinished ? (
@@ -333,7 +353,7 @@ export default function CalendarPage() {
     const getTasksForDate = (dateStr: string) => {
         return tasks.filter((t) => {
             const isMatch = t.due_date === dateStr;
-            const isCompletedMatch = showCompleted || !t.is_completed;
+            const isCompletedMatch = showCompleted || !(t.is_completed ?? false);
             return isMatch && isCompletedMatch;
         });
     };
@@ -603,6 +623,11 @@ export default function CalendarPage() {
                         <p className="text-sm text-gray-500">Create a task scheduled for {createTargetDate}</p>
                     </DialogHeader>
                     <form className="space-y-4" onSubmit={handleCreateTask}>
+                        {formError && (
+                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 font-medium">
+                                {formError}
+                            </div>
+                        )}
                         
                         {/* Board Selector */}
                         <div className="space-y-1.5">
@@ -701,14 +726,14 @@ export default function CalendarPage() {
 
                         {/* Form Submission */}
                         <div className="flex justify-end space-x-2 pt-4 border-t">
-                            <Button variant="outline" type="button" onClick={() => setIsCreateOpen(false)}>
+                            <Button variant="outline" type="button" onClick={() => setIsCreateOpen(false)} disabled={formSubmitting}>
                                 Cancel
                             </Button>
                             <Button 
                                 type="submit" 
-                                disabled={!formTitle.trim() || !formColumnId}
+                                disabled={!formTitle.trim() || !formColumnId || formSubmitting}
                             >
-                                Add Task
+                                {formSubmitting ? "Adding..." : "Add Task"}
                             </Button>
                         </div>
                     </form>

@@ -116,17 +116,19 @@ export const taskService = {
         return (data || []) as unknown as Task[];
     },
     async createTask(supabase: SupabaseClient, task: Omit<Task, "id" | "created_at" | "updated_at" | "is_completed"> & { is_completed?: boolean }): Promise<Task> {
+        // Destructure out is_completed so we don't send it to the database
+        // (the column may not exist yet). If it does exist, Supabase will default it.
+        const { is_completed, ...taskWithoutCompleted } = task as any;
+
         const { data, error } = await supabase
             .from("tasks")
-            .insert({
-                ...task,
-                is_completed: task.is_completed ?? false
-            })
+            .insert(taskWithoutCompleted)
             .select()
             .single();
 
         if (error) throw error;
-        return data;
+        // Ensure is_completed is present on the returned object for the UI
+        return { ...data, is_completed: data.is_completed ?? false };
     },
     async moveTask(supabase: SupabaseClient, taskId: string, newColumnId: string, newOrder: number) {
         const { data, error } = await supabase
@@ -151,7 +153,10 @@ export const taskService = {
         if (error) throw error;
         return data;
     },
-    async toggleTaskCompletion(supabase: SupabaseClient, taskId: string, isCompleted: boolean): Promise<Task> {
+    async toggleTaskCompletion(supabase: SupabaseClient, taskId: string, isCompleted: boolean): Promise<Task | null> {
+        // Try to update is_completed in the database.
+        // If the column doesn't exist yet, silently return null
+        // and the caller will handle it with local state only.
         const { data, error } = await supabase
             .from("tasks")
             .update({ is_completed: isCompleted })
@@ -159,7 +164,14 @@ export const taskService = {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            if (error.code === "PGRST204" || (error.message && error.message.includes("is_completed"))) {
+                // Column doesn't exist yet — completion will only be tracked in local state
+                console.warn("is_completed column not found in database. Completion tracked locally only.");
+                return null;
+            }
+            throw error;
+        }
         return data;
     },
 };

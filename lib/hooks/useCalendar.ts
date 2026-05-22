@@ -30,9 +30,9 @@ export function useCalendar() {
             const userBoards = await boardService.getBoards(supabase, user.id);
             setBoards(userBoards);
 
-            // Get user tasks
+            // Get user tasks and default is_completed to false if missing
             const userTasks = await taskService.getTasksByUser(supabase, user.id);
-            setTasks(userTasks);
+            setTasks(userTasks.map(t => ({ ...t, is_completed: t.is_completed ?? false })));
         } catch (err) {
             console.error("Failed to load calendar data:", err);
             setError(err instanceof Error ? err.message : "Failed to load calendar data.");
@@ -49,20 +49,21 @@ export function useCalendar() {
             return updated;
         } catch (err) {
             console.error("Failed to update task date:", err);
-            setError(err instanceof Error ? err.message : "Failed to update task date.");
             throw err;
         }
     }
 
     async function toggleTaskCompletion(taskId: string, isCompleted: boolean) {
         if (!supabase) return;
+        // Always update local state immediately for instant UI feedback
+        setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, is_completed: isCompleted } : t));
         try {
-            const updated = await taskService.toggleTaskCompletion(supabase, taskId, isCompleted);
-            setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, is_completed: isCompleted } : t));
-            return updated;
+            await taskService.toggleTaskCompletion(supabase, taskId, isCompleted);
+            // If it returns null, the column doesn't exist — local state is still updated above
         } catch (err) {
             console.error("Failed to update task completion status:", err);
-            setError(err instanceof Error ? err.message : "Failed to update task completion status.");
+            // Revert local state on unexpected errors
+            setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, is_completed: !isCompleted } : t));
             throw err;
         }
     }
@@ -84,14 +85,12 @@ export function useCalendar() {
                 due_date: taskData.dueDate,
                 column_id: taskData.columnId,
                 priority: taskData.priority || "medium",
-                sort_order: 0,
-                is_completed: false
+                sort_order: 0
             });
-            setTasks((prev) => [...prev, newTask]);
+            setTasks((prev) => [...prev, { ...newTask, is_completed: newTask.is_completed ?? false }]);
             return newTask;
         } catch (err) {
             console.error("Failed to create task from calendar:", err);
-            setError(err instanceof Error ? err.message : "Failed to create task.");
             throw err;
         }
     }
