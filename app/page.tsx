@@ -161,7 +161,7 @@ export default function HomePage() {
             {/* Sparkles Teaser Badge */}
             <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full border border-zinc-200 bg-white/80 backdrop-blur-sm text-xs font-medium text-zinc-700 mb-8 shadow-sm relative z-10">
               <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-              <span>Personal Focus Workspace + Interactive Calendar Coming Soon</span>
+              <span>Personal Focus Workspace + Interactive Calendar</span>
             </div>
 
             {/* Title */}
@@ -173,7 +173,7 @@ export default function HomePage() {
             </h1>
             {/* Description */}
             <p className="text-lg md:text-xl text-zinc-500 mb-10 max-w-2xl mx-auto leading-relaxed relative z-10 font-normal">
-              A minimalist personal task manager built to help you track goals, organize side projects, and visualize your time. Features custom task boards and a calendar timeline coming soon.
+              A minimalist personal task manager built to help you track goals, organize side projects, and visualize your time. Features custom task boards and a calendar timeline.
             </p>
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center relative z-10 w-full sm:w-auto">
@@ -227,9 +227,6 @@ export default function HomePage() {
                 <div className="h-12 w-12 rounded-xl bg-purple-50 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Calendar className="h-6 w-6 text-purple-500" />
                 </div>
-                <span className="text-[10px] tracking-wider font-bold px-2 py-0.5 rounded-full border border-purple-200 bg-purple-50 text-purple-600">
-                  COMING SOON
-                </span>
               </div>
               <h3 className="text-xl font-semibold text-zinc-900 mb-3">Interactive Calendar</h3>
               <p className="text-zinc-600 text-sm leading-relaxed">

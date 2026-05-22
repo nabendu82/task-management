@@ -99,10 +99,29 @@ export const taskService = {
         if (error) throw error;
         return data || [];
     },
-    async createTask(supabase: SupabaseClient, task: Omit<Task, "id" | "created_at" | "updated_at">): Promise<Task> {
+    async getTasksByUser(supabase: SupabaseClient, userId: string): Promise<Task[]> {
         const { data, error } = await supabase
             .from("tasks")
-            .insert(task)
+            .select(`
+                *,
+                columns!inner(
+                    board_id,
+                    boards!inner(user_id)
+                )
+            `)
+            .eq("columns.boards.user_id", userId)
+            .order("due_date", { ascending: true });
+
+        if (error) throw error;
+        return (data || []) as unknown as Task[];
+    },
+    async createTask(supabase: SupabaseClient, task: Omit<Task, "id" | "created_at" | "updated_at" | "is_completed"> & { is_completed?: boolean }): Promise<Task> {
+        const { data, error } = await supabase
+            .from("tasks")
+            .insert({
+                ...task,
+                is_completed: task.is_completed ?? false
+            })
             .select()
             .single();
 
@@ -117,6 +136,28 @@ export const taskService = {
                 sort_order: newOrder,
             })
             .eq("id", taskId);
+
+        if (error) throw error;
+        return data;
+    },
+    async updateTaskDueDate(supabase: SupabaseClient, taskId: string, dueDate: string | null): Promise<Task> {
+        const { data, error } = await supabase
+            .from("tasks")
+            .update({ due_date: dueDate })
+            .eq("id", taskId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+    async toggleTaskCompletion(supabase: SupabaseClient, taskId: string, isCompleted: boolean): Promise<Task> {
+        const { data, error } = await supabase
+            .from("tasks")
+            .update({ is_completed: isCompleted })
+            .eq("id", taskId)
+            .select()
+            .single();
 
         if (error) throw error;
         return data;
