@@ -26,6 +26,12 @@ export default function DashboardPage() {
         taskCount: { min: null as number | null, max: null as number | null }
     });
 
+    const filterCount = (filters.search ? 1 : 0) +
+        (filters.dateRange.start ? 1 : 0) +
+        (filters.dateRange.end ? 1 : 0) +
+        (filters.taskCount.min !== null ? 1 : 0) +
+        (filters.taskCount.max !== null ? 1 : 0);
+
     const boardsWithTaskCount = boards.map((board: Board) => ({ ...board, taskCount: 0 }));
 
     const filteredBoards = boardsWithTaskCount.filter((board: Board) => {
@@ -142,9 +148,14 @@ export default function DashboardPage() {
                                     <List />
                                 </Button>
                             </div>
-                            <Button variant="outline" size="sm" onClick={() => setIsFilterOpen(true)}>
-                                <Filter />
+                            <Button variant="outline" size="sm" className={`text-xs sm:text-sm ${filterCount > 0 ? "bg-blue-100 border-blue-200" : ""}`} onClick={() => setIsFilterOpen(true)}>
+                                <Filter className="h-4 w-4 mr-2" />
                                 Filter
+                                {filterCount > 0 && (
+                                    <Badge variant="secondary" className="text-xs ml-2 bg-blue-100 border-blue-200">
+                                        {filterCount}
+                                    </Badge>
+                                )}
                             </Button>
                             <Button onClick={handleCreateBoard}>
                                 <Plus />
@@ -155,7 +166,7 @@ export default function DashboardPage() {
                     {/* Search Bar */}
                     <div className="relative mb-4 sm:mb-6">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <Input id="search" placeholder="Search boards..." className="pl-10" onChange={e => setFilters(prev => ({ ...prev, search: e.target.value }))} />
+                        <Input id="search" placeholder="Search boards..." className="pl-10" value={filters.search} onChange={e => setFilters(prev => ({ ...prev, search: e.target.value }))} />
                     </div>
                     {/* Boards Grid/List */}
                     {boards.length === 0 ? (
@@ -233,18 +244,18 @@ export default function DashboardPage() {
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <Label>Search</Label>
-                            <Input id="search" placeholder="Search board titles..." onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))} />
+                            <Input id="search" placeholder="Search board titles..." value={filters.search} onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))} />
                         </div>
                         <div className="space-y-2">
                             <Label>Date Range</Label>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <div>
                                     <Label className="text-xs">Start Date</Label>
-                                    <Input type="date" onChange={(e) => setFilters(prev => ({ ...prev, dateRange: { ...prev.dateRange, start: e.target.value || null, }, }))} />
+                                    <Input type="date" value={filters.dateRange.start || ""} onChange={(e) => setFilters(prev => ({ ...prev, dateRange: { ...prev.dateRange, start: e.target.value || null, }, }))} />
                                 </div>
                                 <div>
                                     <Label className="text-xs">End Date</Label>
-                                    <Input type="date" onChange={(e) => setFilters(prev => ({ ...prev, dateRange: { ...prev.dateRange, end: e.target.value || null, }, }))} />
+                                    <Input type="date" value={filters.dateRange.end || ""} onChange={(e) => setFilters(prev => ({ ...prev, dateRange: { ...prev.dateRange, end: e.target.value || null, }, }))} />
                                 </div>
                             </div>
                         </div>
@@ -253,11 +264,11 @@ export default function DashboardPage() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <div>
                                     <Label className="text-xs">Minimum</Label>
-                                    <Input type="number" min="0" placeholder="Min tasks" onChange={e => setFilters(prev => ({ ...prev, taskCount: { ...prev.taskCount, min: e.target.value ? Number(e.target.value) : null, }, }))} />
+                                    <Input type="number" min="0" placeholder="Min tasks" value={filters.taskCount.min !== null ? filters.taskCount.min : ""} onChange={e => setFilters(prev => ({ ...prev, taskCount: { ...prev.taskCount, min: e.target.value ? Number(e.target.value) : null, }, }))} />
                                 </div>
                                 <div>
                                     <Label className="text-xs">Maximum</Label>
-                                    <Input type="number" min="0" placeholder="Max tasks" onChange={e => setFilters(prev => ({ ...prev, taskCount: { ...prev.taskCount, max: e.target.value ? Number(e.target.value) : null, }, }))} />
+                                    <Input type="number" min="0" placeholder="Max tasks" value={filters.taskCount.max !== null ? filters.taskCount.max : ""} onChange={e => setFilters(prev => ({ ...prev, taskCount: { ...prev.taskCount, max: e.target.value ? Number(e.target.value) : null, }, }))} />
                                 </div>
                             </div>
                         </div>
