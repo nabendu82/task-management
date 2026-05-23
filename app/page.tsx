@@ -158,46 +158,51 @@ export default function HomePage() {
             {/* Glow Background Element */}
             <div className="w-72 h-72 rounded-full bg-blue-500/5 blur-[120px] absolute -top-12 z-0 pointer-events-none" />
 
-            {/* Sparkles Teaser Badge */}
-            <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full border border-zinc-200 bg-white/80 backdrop-blur-sm text-xs font-medium text-zinc-700 mb-8 shadow-sm relative z-10">
-              <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-              <span>Personal Focus Workspace + Interactive Calendar</span>
-            </div>
-
-            {/* Title */}
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-zinc-950 mb-6 relative z-10 leading-[1.15]">
-              Organize your flow, <br />
-              <span className="bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(99,102,241,0.1)]">
-                effortlessly.
-              </span>
-            </h1>
-            {/* Description */}
-            <p className="text-lg md:text-xl text-zinc-500 mb-10 max-w-2xl mx-auto leading-relaxed relative z-10 font-normal">
-              A minimalist personal task manager built to help you track goals, organize side projects, and visualize your time. Features custom task boards and a calendar timeline.
-            </p>
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center relative z-10 w-full sm:w-auto">
-              {isSignedIn ? (
-                <Link href="/dashboard" className="w-full sm:w-auto">
-                  <Button size="lg" className="w-full sm:w-auto text-lg px-8 rounded-full bg-zinc-950 hover:bg-zinc-800 text-white shadow-md transition-all">
-                    Go to Dashboard
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
-              ) : (
-                <>
-                  <SignUpButton>
-                    <Button size="lg" className="text-lg px-8 rounded-full bg-zinc-950 hover:bg-zinc-800 text-white shadow-md transition-all">Get Started Free<ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                  </SignUpButton>
-                  <SignInButton>
-                    <Button variant="outline" size="lg" className="text-lg px-8 rounded-full border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 transition-all shadow-sm">
-                      Sign In
-                    </Button>
-                  </SignInButton>
-                </>
-              )}
-            </div>
+             {/* Sparkles Teaser Badge */}
+             <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full border border-purple-200 bg-purple-50/50 backdrop-blur-sm text-xs font-medium text-purple-700 mb-8 shadow-sm relative z-10">
+               <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+               <span>Private Workspace Instance • Authorized Access Only</span>
+             </div>
+ 
+             {/* Title */}
+             <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-zinc-950 mb-6 relative z-10 leading-[1.15]">
+               Organize your flow, <br />
+               <span className="bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(99,102,241,0.1)]">
+                 effortlessly.
+               </span>
+             </h1>
+             {/* Description */}
+             <p className="text-lg md:text-xl text-zinc-500 mb-10 max-w-2xl mx-auto leading-relaxed relative z-10 font-normal">
+               A minimalist personal task manager built to help you track goals, organize side projects, and visualize your time. Features custom task boards and a calendar timeline.
+             </p>
+             {/* CTA Buttons */}
+             <div className="flex flex-col sm:flex-row gap-4 justify-center relative z-10 w-full sm:w-auto">
+               {isSignedIn ? (
+                 <Link href="/dashboard" className="w-full sm:w-auto">
+                   <Button size="lg" className="w-full sm:w-auto text-lg px-8 rounded-full bg-zinc-950 hover:bg-zinc-800 text-white shadow-md transition-all">
+                     Go to Dashboard
+                     <ArrowRight className="ml-2 h-5 w-5" />
+                   </Button>
+                 </Link>
+               ) : (
+                 <>
+                   <a 
+                     href="mailto:nabendu.biswas@gmail.com?subject=Task%20Management%20-%20Demo%20and%20Access%20Request"
+                     className="w-full sm:w-auto"
+                   >
+                     <Button size="lg" className="w-full sm:w-auto text-lg px-8 rounded-full bg-zinc-950 hover:bg-zinc-800 text-white shadow-md transition-all">
+                       Contact for Demo
+                       <ArrowRight className="ml-2 h-5 w-5" />
+                     </Button>
+                   </a>
+                   <SignInButton>
+                     <Button variant="outline" size="lg" className="text-lg px-8 rounded-full border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 transition-all shadow-sm">
+                       Sign In
+                     </Button>
+                   </SignInButton>
+                 </>
+               )}
+             </div>
           </div>
         </div>
       </main>

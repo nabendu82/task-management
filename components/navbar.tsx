@@ -28,9 +28,10 @@ export default function Navbar({ boardTitle, onEditBoard, onFilterClick, filterC
         return (
             <header className="border-b border-zinc-200/50 bg-white/40 backdrop-blur-md sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 sm:space-x-3">
                         <Trello className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
                         <span className="text-xl sm:text-2xl font-bold text-zinc-900 tracking-tight">Task Management</span>
+                        <Badge variant="outline" className="hidden sm:inline-flex bg-zinc-100/80 border-zinc-200 text-zinc-600 text-[10px] py-0.5 px-2 rounded-full uppercase font-bold tracking-wider">Private</Badge>
                     </div>
                     <div className="flex items-center space-x-2 sm:space-x-4">
                         {isSignedIn ? (
@@ -45,13 +46,11 @@ export default function Navbar({ boardTitle, onEditBoard, onFilterClick, filterC
                                 </Link>
                             </div>
                         ) : (
-                            <div className="flex items-center space-x-2 sm:space-x-4">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-[11px] text-zinc-500 mr-2 hidden md:inline">Private workspace</span>
                                 <SignInButton>
-                                    <Button variant="ghost" size="sm" className="text-xs sm:text-sm text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/50">Sign In</Button>
+                                    <Button size="sm" className="text-xs sm:text-sm bg-zinc-950 text-white hover:bg-zinc-800 transition-all font-medium">Sign In</Button>
                                 </SignInButton>
-                                <SignUpButton>
-                                    <Button size="sm" className="text-xs sm:text-sm bg-zinc-950 text-white hover:bg-zinc-800 transition-all font-medium">Sign Up</Button>
-                                </SignUpButton>
                             </div>
                         )}
                     </div>
