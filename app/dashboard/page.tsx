@@ -205,12 +205,6 @@ export default function DashboardPage() {
                                     </Link>
                                 );
                             })}
-                            <Card className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors cursor-pointer group h-full min-h-[200px]">
-                                <CardContent className="p-4 sm:p-6 flex flex-col items-center justify-center h-full">
-                                    <Plus className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400 group-hover:text-blue-600 mb-2" />
-                                    <p className="text-sm sm:text-base text-gray-600 group-hover:text-blue-600 font-medium">Create new board</p>
-                                </CardContent>
-                            </Card>
                         </div>
                     ) : (
                         <div>
@@ -239,12 +233,6 @@ export default function DashboardPage() {
                                     </div>
                                 );
                             })}
-                            <Card className="mt-4 border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors cursor-pointer group">
-                                <CardContent className="p-4 sm:p-6 flex flex-col items-center justify-center h-full min-h-[200px]">
-                                    <Plus className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400 group-hover:text-blue-600 mb-2" />
-                                    <p className="text-sm sm:text-base text-gray-600 group-hover:text-blue-600 font-medium">Create new board</p>
-                                </CardContent>
-                            </Card>
                         </div>
                     )}
                 </div>
@@ -256,22 +244,22 @@ export default function DashboardPage() {
                         <p className="text-gray-600">Track and schedule tasks across days, weeks, or months.</p>
                     </div>
                     <Link href="/calendar">
-                        <Card className="hover:shadow-lg transition-all cursor-pointer group border border-blue-100 bg-blue-50/40 hover:bg-blue-50/60 overflow-hidden relative">
+                        <Card className="hover:shadow-lg transition-all cursor-pointer group border border-purple-200 bg-purple-50 hover:bg-purple-100/60 overflow-hidden relative">
                             <CardContent className="p-8 sm:p-12 flex flex-col sm:flex-row items-center sm:justify-between space-y-6 sm:space-y-0">
                                 <div className="flex flex-col sm:flex-row items-center text-center sm:text-left space-y-4 sm:space-y-0 sm:space-x-6">
-                                    <div className="h-16 w-16 bg-blue-100 group-hover:bg-blue-600 rounded-2xl flex items-center justify-center transition-colors shadow-inner">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8 text-blue-600 group-hover:text-white transition-colors">
+                                    <div className="h-16 w-16 bg-purple-100 group-hover:bg-purple-600 rounded-2xl flex items-center justify-center transition-colors shadow-inner">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8 text-purple-600 group-hover:text-white transition-colors">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
                                         </svg>
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">Open Personal Calendar</h3>
+                                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-purple-600 transition-colors">Open Personal Calendar</h3>
                                         <p className="text-sm text-gray-600 mt-1 max-w-md">
                                             View all your tasks scheduled by due date. Drag and drop to reschedule instantly, toggle task completions, and review your history.
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex items-center text-blue-600 font-medium group-hover:translate-x-2 transition-transform">
+                                <div className="flex items-center text-purple-600 font-medium group-hover:translate-x-2 transition-transform">
                                     <span>Go to Calendar</span>
                                     <ArrowRight className="ml-2 h-5 w-5" />
                                 </div>
