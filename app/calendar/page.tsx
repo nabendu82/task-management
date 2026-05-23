@@ -77,7 +77,7 @@ export default function CalendarPage() {
     // Pre-populate board selection when opening dialog
     useEffect(() => {
         if (isCreateOpen && boards.length > 0 && !formBoardId) {
-            setFormBoardId(boards[0].id);
+            setFormBoardId(boards[0].id.toString());
         }
     }, [isCreateOpen, boards]);
 
@@ -87,7 +87,7 @@ export default function CalendarPage() {
             const cols = await getColumnsForBoard(boardId);
             setBoardColumns(cols);
             if (cols.length > 0) {
-                setFormColumnId(cols[0].id);
+                setFormColumnId(cols[0].id.toString());
             } else {
                 setFormColumnId("");
             }
@@ -644,11 +644,13 @@ export default function CalendarPage() {
                             <Label htmlFor="boardId">Board *</Label>
                             <Select value={formBoardId} onValueChange={(val) => setFormBoardId(val || "")} required>
                                 <SelectTrigger id="boardId">
-                                    <SelectValue placeholder="Select a board" />
+                                    <SelectValue placeholder="Select a board">
+                                        {(value) => value ? (boards.find((b) => b.id.toString() === value)?.title || value) : undefined}
+                                    </SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
                                     {boards.map((b) => (
-                                        <SelectItem key={b.id} value={b.id}>
+                                        <SelectItem key={b.id} value={b.id.toString()}>
                                             {b.title}
                                         </SelectItem>
                                     ))}
@@ -666,11 +668,13 @@ export default function CalendarPage() {
                                 disabled={columnsLoading || boardColumns.length === 0}
                             >
                                 <SelectTrigger id="columnId">
-                                    <SelectValue placeholder={columnsLoading ? "Loading columns..." : "Select column"} />
+                                    <SelectValue placeholder={columnsLoading ? "Loading columns..." : "Select column"}>
+                                        {(value) => value ? (boardColumns.find((c) => c.id.toString() === value)?.title || value) : undefined}
+                                    </SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
                                     {boardColumns.map((c) => (
-                                        <SelectItem key={c.id} value={c.id}>
+                                        <SelectItem key={c.id} value={c.id.toString()}>
                                             {c.title}
                                         </SelectItem>
                                     ))}
@@ -723,7 +727,9 @@ export default function CalendarPage() {
                                     onValueChange={(val: any) => setFormPriority(val)}
                                 >
                                     <SelectTrigger id="taskPriority">
-                                        <SelectValue />
+                                        <SelectValue>
+                                            {(value) => value ? value.charAt(0).toUpperCase() + value.slice(1) : undefined}
+                                        </SelectValue>
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="low">Low</SelectItem>

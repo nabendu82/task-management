@@ -95,7 +95,7 @@ function DroppableColumn({ column, children, onCreateTask, onEditColumn, isCreat
     );
 }
 
-function SortableTask({ task }: { task: Task }) {
+function SortableTask({ task, onEditTask }: { task: Task; onEditTask: (task: Task) => void }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging, } = useSortable({ id: task.id });
     const styles = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, };
     function getPriorityColor(priority: "low" | "medium" | "high"): string {
@@ -118,6 +118,18 @@ function SortableTask({ task }: { task: Task }) {
                         {/* Task Header */}
                         <div className="flex items-start justify-between">
                             <h4 className="font-medium text-gray-900 text-sm leading-tight flex-1 min-w-0 pr-2">{task.title}</h4>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 w-8 p-0 flex-shrink-0"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEditTask(task);
+                                }}
+                            >
+                                <MoreHorizontal className="h-4 w-4 text-gray-500 hover:text-gray-700" />
+                            </Button>
                         </div>
                         {/* Task Description */}
                         <p className="text-xs text-gray-600 line-clamp-2">{task.description || "No description."}</p>
@@ -201,7 +213,7 @@ function TaskOverlay({ task }: { task: Task }) {
 
 export default function BoardPage() {
     const { id } = useParams<{ id: string }>();
-    const { board, createColumn, updateBoard, columns, createRealTask, setColumns, moveTask, updateColumn } = useBoard(id);
+    const { board, createColumn, updateBoard, columns, createRealTask, updateRealTask, setColumns, moveTask, updateColumn } = useBoard(id);
 
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [newTitle, setNewTitle] = useState("");
@@ -216,6 +228,8 @@ export default function BoardPage() {
     const [activeTask, setActiveTask] = useState<Task | null>(null);
     const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
     const [createTaskColumnId, setCreateTaskColumnId] = useState<string | null>(null);
+    const [editingTask, setEditingTask] = useState<Task | null>(null);
+    
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8, }, }));
 
@@ -235,6 +249,25 @@ export default function BoardPage() {
             await updateBoard(board.id, { title: newTitle.trim(), color: newColor || board.color });
             setIsEditingTitle(false);
         } catch { }
+    }
+
+    async function handleUpdateTaskSubmit(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
+        if (!editingTask) return;
+
+        const formData = new FormData(e.currentTarget);
+        const updates = {
+            title: (formData.get("title") as string).trim(),
+            description: (formData.get("description") as string)?.trim() || null,
+            assignee: (formData.get("assignee") as string)?.trim() || null,
+            due_date: (formData.get("dueDate") as string) || null,
+            priority: (formData.get("priority") as "low" | "medium" | "high") || "medium",
+        };
+
+        if (updates.title) {
+            await updateRealTask(editingTask.id, updates);
+            setEditingTask(null);
+        }
     }
 
     async function createTask(taskData: { title: string; description?: string; assignee?: string; dueDate?: string; priority: "low" | "medium" | "high"; }) {
@@ -466,7 +499,9 @@ export default function BoardPage() {
                                         <Label>Priority</Label>
                                         <Select name="priority" defaultValue="medium">
                                             <SelectTrigger>
-                                                <SelectValue />
+                                                <SelectValue>
+                                                    {(value) => value ? value.charAt(0).toUpperCase() + value.slice(1) : undefined}
+                                                </SelectValue>
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {["low", "medium", "high"].map((priority, key) => (
@@ -498,7 +533,7 @@ export default function BoardPage() {
                                     onCreateTaskOpenChange={(open) => { setIsCreateTaskOpen(open); if (open) setCreateTaskColumnId(column.id); else setCreateTaskColumnId(null); }}>
                                     <SortableContext items={column.tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
                                         <div className="space-y-3">
-                                            {column.tasks.map((task, key) => (<SortableTask task={task} key={key} />))}
+                                            {column.tasks.map((task, key) => (<SortableTask task={task} key={key} onEditTask={setEditingTask} />))}
                                         </div>
                                     </SortableContext>
                                 </DroppableColumn>
@@ -557,6 +592,58 @@ export default function BoardPage() {
                             <Button type="submit">Edit Column</Button>
                         </div>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={editingTask !== null} onOpenChange={(open) => { if (!open) setEditingTask(null); }}>
+                <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
+                    {editingTask && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>Edit Task</DialogTitle>
+                                <p className="text-sm text-gray-600">Update task details</p>
+                            </DialogHeader>
+                            <form className="space-y-4" onSubmit={handleUpdateTaskSubmit}>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-title">Title *</Label>
+                                    <Input id="edit-title" name="title" defaultValue={editingTask.title} placeholder="Enter task title" required />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-description">Description</Label>
+                                    <Textarea id="edit-description" name="description" defaultValue={editingTask.description || ""} placeholder="Enter task description" rows={3} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-assignee">Assignee</Label>
+                                    <Input id="edit-assignee" name="assignee" defaultValue={editingTask.assignee || ""} placeholder="Who should do this?" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Priority</Label>
+                                    <Select name="priority" defaultValue={editingTask.priority}>
+                                        <SelectTrigger>
+                                            <SelectValue>
+                                                {(value) => value ? value.charAt(0).toUpperCase() + value.slice(1) : undefined}
+                                            </SelectValue>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {["low", "medium", "high"].map((priority, key) => (
+                                                <SelectItem key={key} value={priority}>
+                                                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-dueDate">Due Date</Label>
+                                    <Input type="date" id="edit-dueDate" name="dueDate" defaultValue={editingTask.due_date || ""} />
+                                </div>
+                                <div className="flex justify-end space-x-2 pt-4">
+                                    <Button type="button" variant="outline" onClick={() => setEditingTask(null)}>Cancel</Button>
+                                    <Button type="submit">Update Task</Button>
+                                </div>
+                            </form>
+                        </>
+                    )}
                 </DialogContent>
             </Dialog>
         </>

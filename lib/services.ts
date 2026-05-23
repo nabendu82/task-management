@@ -154,6 +154,17 @@ export const taskService = {
         if (error) throw error;
         return data;
     },
+    async updateTask(supabase: SupabaseClient, taskId: string, updates: Partial<Task>): Promise<Task> {
+        const { data, error } = await supabase
+            .from("tasks")
+            .update(updates)
+            .eq("id", taskId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
     async toggleTaskCompletion(supabase: SupabaseClient, taskId: string, isCompleted: boolean): Promise<Task | null> {
         // Try to update is_completed in the database.
         // If the column doesn't exist yet, silently return null
