@@ -310,6 +310,11 @@ export default function CalendarPage() {
                     <p className={`text-xs font-semibold text-gray-800 truncate leading-tight ${isFinished ? "line-through text-gray-400" : ""}`}>
                         {task.title}
                     </p>
+                    {task.description && (
+                        <p className={`text-[10px] text-gray-500 truncate mt-0.5 leading-snug ${isFinished ? "line-through text-gray-300" : ""}`}>
+                            {task.description}
+                        </p>
+                    )}
                     {task.assignee && (
                         <div className="flex items-center space-x-1 mt-0.5 text-[10px] text-gray-400">
                             <User className="h-2.5 w-2.5" />
@@ -620,7 +625,7 @@ export default function CalendarPage() {
                 <DialogContent className="w-[95vw] max-w-[450px] mx-auto">
                     <DialogHeader>
                         <DialogTitle>Add Task to Calendar</DialogTitle>
-                        <p className="text-sm text-gray-500">Create a task scheduled for {createTargetDate}</p>
+                        <p className="text-sm text-gray-500">Create a task for your calendar</p>
                     </DialogHeader>
                     <form className="space-y-4" onSubmit={handleCreateTask}>
                         {formError && (
@@ -722,6 +727,17 @@ export default function CalendarPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
+                        </div>
+
+                        {/* Due Date */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="taskDueDate">Due Date</Label>
+                            <Input 
+                                id="taskDueDate" 
+                                type="date" 
+                                value={createTargetDate}
+                                onChange={(e) => setCreateTargetDate(e.target.value)}
+                            />
                         </div>
 
                         {/* Form Submission */}
