@@ -375,59 +375,108 @@ export default function CalendarPage() {
         const todayStr = formatDateKey(new Date());
 
         return (
-            <div className="flex-1 flex flex-col bg-white rounded-2xl border shadow-xs overflow-hidden">
-                {/* Weekday headers */}
-                <div className="grid grid-cols-7 border-b bg-slate-50/50 text-center font-semibold text-xs text-gray-500 uppercase tracking-wider py-3">
-                    {weekdays.map((day) => (
-                        <div key={day}>{day}</div>
-                    ))}
+            <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 flex flex-col bg-white rounded-2xl border shadow-xs overflow-hidden">
+                    {/* Weekday headers */}
+                    <div className="grid grid-cols-7 border-b bg-slate-50/50 text-center font-semibold text-xs text-gray-500 uppercase tracking-wider py-3">
+                        {weekdays.map((day) => (
+                            <div key={day}>{day}</div>
+                        ))}
+                    </div>
+
+                    {/* Day Cells Grid */}
+                    <div className="grid grid-cols-7 flex-grow divide-x divide-y divide-slate-100 bg-slate-50/20">
+                        {days.map((day, idx) => {
+                            const dateStr = formatDateKey(day);
+                            const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                            const isToday = dateStr === todayStr;
+                            const isSelected = formatDateKey(day) === formatDateKey(currentDate);
+                            const dateTasks = getTasksForDate(dateStr);
+                            const isOver = dragOverDate === dateStr;
+
+                            return (
+                                <div
+                                    key={idx}
+                                    onClick={() => setCurrentDate(day)}
+                                    onDragOver={(e) => handleDragOver(e, dateStr)}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={(e) => handleDrop(e, dateStr)}
+                                    className={`min-h-[60px] sm:min-h-[120px] p-1 sm:p-2 flex flex-col space-y-1 transition-all cursor-pointer ${
+                                        isCurrentMonth ? "bg-white" : "bg-gray-50/50 text-gray-400"
+                                    } ${isToday ? "bg-blue-50/20" : ""} ${
+                                        isSelected ? "ring-2 ring-blue-600 ring-inset bg-blue-50/30" : ""
+                                    } ${
+                                        isOver ? "ring-2 ring-blue-500 ring-inset bg-blue-50/40" : ""
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between mb-0.5 sm:mb-1">
+                                        <span 
+                                            className={`text-[10px] sm:text-xs font-bold h-5 w-5 sm:h-6 sm:w-6 rounded-full flex items-center justify-center ${
+                                                isToday 
+                                                    ? "bg-blue-600 text-white shadow-xs" 
+                                                    : isCurrentMonth ? "text-gray-700" : "text-gray-400"
+                                            }`}
+                                        >
+                                            {day.getDate()}
+                                        </span>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                openCreateDialog(dateStr);
+                                            }}
+                                            className="h-5 w-5 rounded-md hover:bg-slate-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors hidden sm:flex"
+                                            title="Add task to this date"
+                                        >
+                                            <Plus className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Desktop view: full task items */}
+                                    <div className="hidden sm:block flex-1 overflow-y-auto space-y-1.5 max-h-[80px] sm:max-h-[100px] scrollbar-thin">
+                                        {dateTasks.map(renderTaskItem)}
+                                    </div>
+
+                                    {/* Mobile view: task dots */}
+                                    <div className="flex sm:hidden flex-wrap justify-center gap-0.5 mt-0.5 max-w-full">
+                                        {dateTasks.slice(0, 3).map((task) => {
+                                            const boardId = (task as any).columns?.board_id;
+                                            const board = boards.find(b => b.id.toString() === boardId?.toString());
+                                            const colorClass = board?.color || "bg-blue-500";
+                                            return (
+                                                <span key={task.id} className={`w-1.5 h-1.5 rounded-full ${colorClass}`} />
+                                            );
+                                        })}
+                                        {dateTasks.length > 3 && (
+                                            <span className="text-[8px] leading-none font-bold text-gray-500">+</span>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
 
-                {/* Day Cells Grid */}
-                <div className="grid grid-cols-7 flex-grow divide-x divide-y divide-slate-100 bg-slate-50/20">
-                    {days.map((day, idx) => {
-                        const dateStr = formatDateKey(day);
-                        const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-                        const isToday = dateStr === todayStr;
-                        const dateTasks = getTasksForDate(dateStr);
-                        const isOver = dragOverDate === dateStr;
-
-                        return (
-                            <div
-                                key={idx}
-                                onDragOver={(e) => handleDragOver(e, dateStr)}
-                                onDragLeave={handleDragLeave}
-                                onDrop={(e) => handleDrop(e, dateStr)}
-                                className={`min-h-[100px] sm:min-h-[120px] p-2 flex flex-col space-y-1 transition-all ${
-                                    isCurrentMonth ? "bg-white" : "bg-gray-50/50 text-gray-400"
-                                } ${isToday ? "bg-blue-50/20" : ""} ${
-                                    isOver ? "ring-2 ring-blue-500 ring-inset bg-blue-50/40" : ""
-                                }`}
-                            >
-                                <div className="flex items-center justify-between mb-1">
-                                    <span 
-                                        className={`text-xs font-bold h-6 w-6 rounded-full flex items-center justify-center ${
-                                            isToday 
-                                                ? "bg-blue-600 text-white shadow-xs" 
-                                                : isCurrentMonth ? "text-gray-700" : "text-gray-400"
-                                        }`}
-                                    >
-                                        {day.getDate()}
-                                    </span>
-                                    <button
-                                        onClick={() => openCreateDialog(dateStr)}
-                                        className="h-5 w-5 rounded-md hover:bg-slate-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors"
-                                        title="Add task to this date"
-                                    >
-                                        <Plus className="h-3.5 w-3.5" />
-                                    </button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto space-y-1.5 max-h-[80px] sm:max-h-[100px] scrollbar-thin">
-                                    {dateTasks.map(renderTaskItem)}
-                                </div>
-                            </div>
-                        );
-                    })}
+                {/* Mobile Tasks List for the Selected Day */}
+                <div className="block sm:hidden mt-4 bg-white rounded-2xl border shadow-xs p-4">
+                    <div className="flex items-center justify-between border-b pb-2 mb-3">
+                        <h3 className="font-bold text-gray-800 text-sm">
+                            Tasks for {currentDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                        </h3>
+                        <Button 
+                            onClick={() => openCreateDialog(formatDateKey(currentDate))} 
+                            size="sm" 
+                            className="h-7 text-xs px-2.5"
+                        >
+                            <Plus className="mr-1 h-3 w-3" /> Add Task
+                        </Button>
+                    </div>
+                    <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                        {getTasksForDate(formatDateKey(currentDate)).length === 0 ? (
+                            <p className="text-xs text-gray-400 text-center py-4">No tasks scheduled for this day.</p>
+                        ) : (
+                            getTasksForDate(formatDateKey(currentDate)).map(renderTaskItem)
+                        )}
+                    </div>
                 </div>
             </div>
         );
@@ -438,7 +487,7 @@ export default function CalendarPage() {
         const todayStr = formatDateKey(new Date());
 
         return (
-            <div className="flex-1 flex bg-white rounded-2xl border shadow-xs overflow-hidden divide-x divide-slate-100">
+            <div className="flex-1 flex flex-col md:flex-row bg-slate-50 md:bg-white rounded-2xl border md:border shadow-xs overflow-hidden md:divide-x divide-slate-100 space-y-3 md:space-y-0 p-3 md:p-0">
                 {days.map((day, idx) => {
                     const dateStr = formatDateKey(day);
                     const isToday = dateStr === todayStr;
@@ -451,16 +500,16 @@ export default function CalendarPage() {
                             onDragOver={(e) => handleDragOver(e, dateStr)}
                             onDragLeave={handleDragLeave}
                             onDrop={(e) => handleDrop(e, dateStr)}
-                            className={`flex-1 flex flex-col p-4 space-y-3 min-h-[450px] transition-all ${
-                                isToday ? "bg-blue-50/10" : "bg-white"
+                            className={`flex-1 flex flex-col p-4 space-y-3 min-h-0 md:min-h-[450px] transition-all rounded-xl md:rounded-none border md:border-0 bg-white ${
+                                isToday ? "bg-blue-50/15 border-blue-200" : "border-slate-100"
                             } ${isOver ? "ring-2 ring-blue-500 ring-inset bg-blue-50/40" : ""}`}
                         >
                             <div className="flex items-center justify-between border-b pb-2">
-                                <div>
+                                <div className="flex md:flex-col items-center md:items-start space-x-2 md:space-x-0">
                                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                         {day.toLocaleDateString("en-US", { weekday: "short" })}
                                     </p>
-                                    <p className={`text-xl font-bold mt-0.5 h-8 w-8 rounded-full flex items-center justify-center ${
+                                    <p className={`text-sm md:text-xl font-bold md:mt-0.5 h-6 w-6 md:h-8 md:w-8 rounded-full flex items-center justify-center ${
                                         isToday ? "bg-blue-600 text-white shadow-xs" : "text-gray-800"
                                     }`}>
                                         {day.getDate()}
@@ -474,8 +523,12 @@ export default function CalendarPage() {
                                     <Plus className="h-4 w-4" />
                                 </button>
                             </div>
-                            <div className="flex-1 overflow-y-auto space-y-2">
-                                {dateTasks.map(renderTaskItem)}
+                            <div className="flex-1 space-y-2">
+                                {dateTasks.length === 0 ? (
+                                    <p className="text-xs text-gray-400 text-center py-2 md:hidden">No tasks</p>
+                                ) : (
+                                    dateTasks.map(renderTaskItem)
+                                )}
                             </div>
                         </div>
                     );
