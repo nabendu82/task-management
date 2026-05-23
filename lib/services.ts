@@ -94,6 +94,7 @@ export const taskService = {
                 columns!inner(board_id)
             `)
             .eq("columns.board_id", boardId)
+            .order("due_date", { ascending: true, nullsFirst: false })
             .order("sort_order", { ascending: true });
 
         if (error) throw error;
@@ -174,6 +175,49 @@ export const taskService = {
         }
         return data;
     },
+    /**
+     * Sync task completion with board columns:
+     * - When completing: move to the last column ("Done") of the task's board
+     * - When uncompleting: move back to the first column ("To Do") of the task's board
+     */
+    async syncTaskColumnOnCompletion(supabase: SupabaseClient, taskId: string, columnId: string, isCompleted: boolean): Promise<void> {
+        try {
+            // Get the board_id from the task's current column
+            const { data: colData, error: colError } = await supabase
+                .from("columns")
+                .select("board_id")
+                .eq("id", columnId)
+                .single();
+
+            if (colError || !colData) return;
+
+            // Get all columns for this board sorted by sort_order
+            const { data: boardColumns, error: boardColError } = await supabase
+                .from("columns")
+                .select("*")
+                .eq("board_id", colData.board_id)
+                .order("sort_order", { ascending: true });
+
+            if (boardColError || !boardColumns || boardColumns.length === 0) return;
+
+            // Find target column: last column for completion, first column for uncomplete
+            const targetColumn = isCompleted
+                ? boardColumns[boardColumns.length - 1]  // "Done" = last column
+                : boardColumns[0];                         // "To Do" = first column
+
+            // Only move if the task isn't already in the target column
+            if (targetColumn.id === columnId) return;
+
+            // Move task to the target column (at the end)
+            await supabase
+                .from("tasks")
+                .update({ column_id: targetColumn.id, sort_order: 9999 })
+                .eq("id", taskId);
+        } catch (err) {
+            console.error("Failed to sync task column on completion:", err);
+            // Non-critical — don't throw, just log
+        }
+    },
 };
 
 export const boardDataService = {
@@ -184,7 +228,16 @@ export const boardDataService = {
         const tasks = await taskService.getTasksByBoard(supabase, boardId);
         const columnsWithTasks = columns.map((column) => ({
             ...column,
-            tasks: tasks.filter((task) => task.column_id === column.id),
+            tasks: tasks
+                .filter((task) => task.column_id === column.id)
+                .sort((a, b) => {
+                    // Sort by due_date ascending, nulls last
+                    if (!a.due_date && !b.due_date) return a.sort_order - b.sort_order;
+                    if (!a.due_date) return 1;
+                    if (!b.due_date) return -1;
+                    const dateCompare = a.due_date.localeCompare(b.due_date);
+                    return dateCompare !== 0 ? dateCompare : a.sort_order - b.sort_order;
+                }),
         }));
 
         return { board, columnsWithTasks };

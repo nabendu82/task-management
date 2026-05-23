@@ -55,11 +55,16 @@ export function useCalendar() {
 
     async function toggleTaskCompletion(taskId: string, isCompleted: boolean) {
         if (!supabase) return;
+        // Find the task to get its column_id for board sync
+        const task = tasks.find(t => t.id === taskId);
         // Always update local state immediately for instant UI feedback
         setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, is_completed: isCompleted } : t));
         try {
             await taskService.toggleTaskCompletion(supabase, taskId, isCompleted);
-            // If it returns null, the column doesn't exist — local state is still updated above
+            // Sync with board columns: move to Done/To Do
+            if (task?.column_id) {
+                await taskService.syncTaskColumnOnCompletion(supabase, taskId, task.column_id, isCompleted);
+            }
         } catch (err) {
             console.error("Failed to update task completion status:", err);
             // Revert local state on unexpected errors
