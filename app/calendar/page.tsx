@@ -37,6 +37,7 @@ export default function CalendarPage() {
         loading,
         error,
         updateTaskDueDate,
+        reorderCalendarTasks,
         toggleTaskCompletion,
         createTaskOnCalendar,
         getColumnsForBoard
@@ -47,6 +48,8 @@ export default function CalendarPage() {
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
     const [showCompleted, setShowCompleted] = useState<boolean>(true);
     const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+    const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+    const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
 
     // Task Creation Dialog States
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -194,6 +197,13 @@ export default function CalendarPage() {
     const handleDragStart = (e: React.DragEvent, taskId: string) => {
         e.dataTransfer.setData("text/plain", taskId);
         e.dataTransfer.effectAllowed = "move";
+        setDraggedTaskId(taskId);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedTaskId(null);
+        setDragOverTaskId(null);
+        setDragOverDate(null);
     };
 
     const handleDragOver = (e: React.DragEvent, dateStr: string) => {
@@ -207,15 +217,17 @@ export default function CalendarPage() {
         setDragOverDate(null);
     };
 
-    const handleDrop = async (e: React.DragEvent, targetDateStr: string) => {
+    const handleDrop = async (e: React.DragEvent, targetDateStr: string, targetTaskId: string | null = null) => {
         e.preventDefault();
         setDragOverDate(null);
+        setDragOverTaskId(null);
+        setDraggedTaskId(null);
+        
         const taskId = e.dataTransfer.getData("text/plain");
         if (!taskId) return;
 
-        // Optimistically update date in state
         try {
-            await updateTaskDueDate(taskId, targetDateStr);
+            await reorderCalendarTasks(taskId, targetTaskId, targetDateStr);
         } catch (err) {
             console.error("Drop failed:", err);
         }
@@ -283,13 +295,37 @@ export default function CalendarPage() {
         const boardId = (task as any).columns?.board_id;
         const board = boards.find(b => b.id.toString() === boardId?.toString());
         const styles = getBoardColorStyles(board?.color);
+        const isDraggedOver = dragOverTaskId === task.id.toString() && draggedTaskId !== task.id.toString();
 
         return (
             <div
                 key={task.id}
                 draggable={!isFinished}
                 onDragStart={(e) => handleDragStart(e, task.id)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (draggedTaskId && draggedTaskId.toString() !== task.id.toString()) {
+                        setDragOverTaskId(task.id.toString());
+                    }
+                }}
+                onDragLeave={() => {
+                    if (dragOverTaskId === task.id.toString()) {
+                        setDragOverTaskId(null);
+                    }
+                }}
+                onDrop={(e) => {
+                    e.stopPropagation();
+                    if (task.due_date) {
+                        handleDrop(e, task.due_date, task.id.toString());
+                    }
+                }}
                 className={`flex items-start space-x-2 p-2 rounded-lg border shadow-xs transition-all ${
+                    isDraggedOver 
+                        ? "border-t-4 border-t-blue-600 scale-[1.01] shadow-md bg-blue-50/20" 
+                        : ""
+                } ${
                     isFinished 
                         ? `opacity-70 ${styles.bg} ${styles.border}` 
                         : `hover:shadow-md hover:border-blue-400 cursor-grab active:cursor-grabbing ${styles.bg} ${styles.border}`

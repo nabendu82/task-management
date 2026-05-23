@@ -60,6 +60,67 @@ export function useCalendar() {
         }
     }
 
+    async function reorderCalendarTasks(draggedTaskId: string, targetTaskId: string | null, targetDateStr: string) {
+        if (!supabase) return;
+        
+        const originalTasks = [...tasks];
+        
+        // Find the task currently being dragged
+        const draggedTask = tasks.find(t => t.id.toString() === draggedTaskId.toString());
+        if (!draggedTask) return;
+        
+        // Get all tasks currently scheduled for the target date, ordered by their current sort_order
+        // If the dragged task is currently on this date, we filter it out so we can insert it at its new position
+        const targetDateTasks = tasks
+            .filter(t => t.due_date === targetDateStr && t.id.toString() !== draggedTaskId.toString())
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+            
+        // Calculate new tasks array for the target date
+        let updatedTargetDateTasks = [...targetDateTasks];
+        
+        if (targetTaskId === null) {
+            // Dropped on the container directly, append to the end
+            updatedTargetDateTasks.push({ ...draggedTask, due_date: targetDateStr });
+        } else {
+            // Dropped on a specific task, insert at that task's index
+            const targetIndex = targetDateTasks.findIndex(t => t.id.toString() === targetTaskId.toString());
+            if (targetIndex === -1) {
+                updatedTargetDateTasks.push({ ...draggedTask, due_date: targetDateStr });
+            } else {
+                updatedTargetDateTasks.splice(targetIndex, 0, { ...draggedTask, due_date: targetDateStr });
+            }
+        }
+        
+        // Re-assign contiguous sort_order values for all tasks on this date
+        const reorderedTasksWithIndices = updatedTargetDateTasks.map((t, idx) => ({
+            ...t,
+            sort_order: idx
+        }));
+        
+        // Optimistically update local React state immediately
+        setTasks((prev) => {
+            const remaining = prev.filter(
+                t => t.id.toString() !== draggedTaskId.toString() && t.due_date !== targetDateStr
+            );
+            return [...remaining, ...reorderedTasksWithIndices];
+        });
+        
+        // Persist to database
+        try {
+            const taskOrders = reorderedTasksWithIndices.map(t => ({
+                id: t.id,
+                sort_order: t.sort_order,
+                due_date: t.id.toString() === draggedTaskId.toString() ? targetDateStr : undefined
+            }));
+            await taskService.reorderTasks(supabase, taskOrders);
+        } catch (err) {
+            console.error("Failed to persist task reordering:", err);
+            // Revert state on failure
+            setTasks(originalTasks);
+            throw err;
+        }
+    }
+
     async function toggleTaskCompletion(taskId: string, isCompleted: boolean) {
         if (!supabase) return;
         // Find the task to get its column_id for board sync
@@ -123,6 +184,7 @@ export function useCalendar() {
         loading,
         error,
         updateTaskDueDate,
+        reorderCalendarTasks,
         toggleTaskCompletion,
         createTaskOnCalendar,
         getColumnsForBoard,

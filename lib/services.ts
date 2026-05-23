@@ -111,10 +111,27 @@ export const taskService = {
                 )
             `)
             .eq("columns.boards.user_id", userId)
-            .order("due_date", { ascending: true });
+            .order("due_date", { ascending: true })
+            .order("sort_order", { ascending: true });
 
         if (error) throw error;
         return (data || []) as unknown as Task[];
+    },
+    async reorderTasks(supabase: SupabaseClient, taskOrders: { id: string; sort_order: number; due_date?: string | null }[]): Promise<void> {
+        const promises = taskOrders.map((t) => {
+            const updates: any = { sort_order: t.sort_order };
+            if (t.due_date !== undefined) {
+                updates.due_date = t.due_date;
+            }
+            return supabase
+                .from("tasks")
+                .update(updates)
+                .eq("id", t.id);
+        });
+        const results = await Promise.all(promises);
+        for (const res of results) {
+            if (res.error) throw res.error;
+        }
     },
     async createTask(supabase: SupabaseClient, task: Omit<Task, "id" | "created_at" | "updated_at" | "is_completed"> & { is_completed?: boolean }): Promise<Task> {
         // Destructure out is_completed so we don't send it to the database
