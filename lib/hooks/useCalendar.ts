@@ -43,12 +43,19 @@ export function useCalendar() {
 
     async function updateTaskDueDate(taskId: string, dueDate: string | null) {
         if (!supabase) return;
+        const task = tasks.find((t) => t.id.toString() === taskId.toString());
+        const originalDueDate = task ? task.due_date : null;
+        
+        // Optimistically update local state immediately
+        setTasks((prev) => prev.map((t) => t.id.toString() === taskId.toString() ? { ...t, due_date: dueDate } : t));
+        
         try {
             const updated = await taskService.updateTaskDueDate(supabase, taskId, dueDate);
-            setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, due_date: dueDate } : t));
             return updated;
         } catch (err) {
             console.error("Failed to update task date:", err);
+            // Revert state on failure
+            setTasks((prev) => prev.map((t) => t.id.toString() === taskId.toString() ? { ...t, due_date: originalDueDate } : t));
             throw err;
         }
     }
@@ -56,9 +63,9 @@ export function useCalendar() {
     async function toggleTaskCompletion(taskId: string, isCompleted: boolean) {
         if (!supabase) return;
         // Find the task to get its column_id for board sync
-        const task = tasks.find(t => t.id === taskId);
+        const task = tasks.find(t => t.id.toString() === taskId.toString());
         // Always update local state immediately for instant UI feedback
-        setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, is_completed: isCompleted } : t));
+        setTasks((prev) => prev.map((t) => t.id.toString() === taskId.toString() ? { ...t, is_completed: isCompleted } : t));
         try {
             await taskService.toggleTaskCompletion(supabase, taskId, isCompleted);
             // Sync with board columns: move to Done/To Do
@@ -68,7 +75,7 @@ export function useCalendar() {
         } catch (err) {
             console.error("Failed to update task completion status:", err);
             // Revert local state on unexpected errors
-            setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, is_completed: !isCompleted } : t));
+            setTasks((prev) => prev.map((t) => t.id.toString() === taskId.toString() ? { ...t, is_completed: !isCompleted } : t));
             throw err;
         }
     }
