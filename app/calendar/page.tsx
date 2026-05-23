@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useCalendar } from "@/lib/hooks/useCalendar";
 import { Task, Column } from "@/lib/supabase/models";
+import { getBoardColorStyles } from "@/lib/utils";
 import { 
     Calendar as CalendarIcon, 
     ChevronLeft, 
@@ -279,15 +280,19 @@ export default function CalendarPage() {
     // Render single task item inside calendar slot
     const renderTaskItem = (task: Task) => {
         const isFinished = task.is_completed ?? false;
+        const boardId = (task as any).columns?.board_id;
+        const board = boards.find(b => b.id.toString() === boardId?.toString());
+        const styles = getBoardColorStyles(board?.color);
+
         return (
             <div
                 key={task.id}
                 draggable={!isFinished}
                 onDragStart={(e) => handleDragStart(e, task.id)}
-                className={`flex items-start space-x-2 p-2 rounded-lg border bg-white shadow-xs transition-all ${
+                className={`flex items-start space-x-2 p-2 rounded-lg border shadow-xs transition-all ${
                     isFinished 
-                        ? "opacity-60 bg-gray-50/50 border-gray-200" 
-                        : "hover:shadow-md hover:border-blue-300 cursor-grab active:cursor-grabbing border-slate-100"
+                        ? `opacity-70 ${styles.bg} ${styles.border}` 
+                        : `hover:shadow-md hover:border-blue-400 cursor-grab active:cursor-grabbing ${styles.bg} ${styles.border}`
                 }`}
             >
                 <button
@@ -298,25 +303,25 @@ export default function CalendarPage() {
                             console.error("Failed to toggle task completion status:", err);
                         }
                     }}
-                    className="mt-0.5 text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
+                    className={`mt-0.5 transition-colors flex-shrink-0 ${isFinished ? styles.accent : "text-gray-400 hover:text-blue-600"}`}
                 >
                     {isFinished ? (
-                        <CheckSquare className="h-4 w-4 text-blue-600" />
+                        <CheckSquare className="h-4 w-4" />
                     ) : (
                         <Square className="h-4 w-4" />
                     )}
                 </button>
                 <div className="min-w-0 flex-1">
-                    <p className={`text-xs font-semibold text-gray-800 truncate leading-tight ${isFinished ? "line-through text-gray-400" : ""}`}>
+                    <p className={`text-xs font-semibold truncate leading-tight ${styles.text} ${isFinished ? "line-through opacity-60" : ""}`}>
                         {task.title}
                     </p>
                     {task.description && (
-                        <p className={`text-[10px] text-gray-500 truncate mt-0.5 leading-snug ${isFinished ? "line-through text-gray-300" : ""}`}>
+                        <p className={`text-[10px] truncate mt-0.5 leading-snug ${styles.text} opacity-80 ${isFinished ? "line-through opacity-40" : ""}`}>
                             {task.description}
                         </p>
                     )}
                     {task.assignee && (
-                        <div className="flex items-center space-x-1 mt-0.5 text-[10px] text-gray-400">
+                        <div className={`flex items-center space-x-1 mt-0.5 text-[10px] ${styles.text} opacity-70`}>
                             <User className="h-2.5 w-2.5" />
                             <span className="truncate">{task.assignee}</span>
                         </div>
