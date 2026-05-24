@@ -141,7 +141,12 @@ export const taskService = {
         const { data, error } = await supabase
             .from("tasks")
             .insert(taskWithoutCompleted)
-            .select()
+            .select(`
+                *,
+                columns (
+                    board_id
+                )
+            `)
             .single();
 
         if (error) throw error;
