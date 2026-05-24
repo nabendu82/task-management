@@ -290,7 +290,7 @@ export default function CalendarPage() {
     }
 
     // Render single task item inside calendar slot
-    const renderTaskItem = (task: Task) => {
+    const renderTaskItem = (task: Task, isMonthDesktop = false) => {
         const isFinished = task.is_completed ?? false;
         const boardId = (task as any).columns?.board_id;
         const board = boards.find(b => b.id.toString() === boardId?.toString());
@@ -321,7 +321,9 @@ export default function CalendarPage() {
                         handleDrop(e, task.due_date, task.id.toString());
                     }
                 }}
-                className={`flex items-start space-x-2 p-2 rounded-lg border shadow-xs transition-all ${
+                className={`flex items-start rounded-lg border shadow-xs transition-all ${
+                    isMonthDesktop ? "p-1.5 space-x-2" : "p-2 sm:px-3 sm:py-2.5 space-x-2 sm:space-x-2.5"
+                } ${
                     isDraggedOver 
                         ? "border-t-4 border-t-blue-600 scale-[1.01] shadow-md bg-blue-50/20" 
                         : ""
@@ -339,31 +341,43 @@ export default function CalendarPage() {
                             console.error("Failed to toggle task completion status:", err);
                         }
                     }}
-                    className={`mt-0.5 transition-colors flex-shrink-0 ${isFinished ? styles.accent : "text-gray-400 hover:text-blue-600"}`}
+                    className={`mt-0.5 transition-colors flex-shrink-0 ${
+                        isMonthDesktop ? "" : "sm:scale-110"
+                    } ${isFinished ? styles.accent : "text-gray-400 hover:text-blue-600"}`}
                 >
                     {isFinished ? (
-                        <CheckSquare className="h-4 w-4" />
+                        <CheckSquare className={isMonthDesktop ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5.5 sm:w-5.5"} />
                     ) : (
-                        <Square className="h-4 w-4" />
+                        <Square className={isMonthDesktop ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5.5 sm:w-5.5"} />
                     )}
                 </button>
                 <div className="min-w-0 flex-1">
-                    <p className={`text-xs font-semibold truncate leading-tight ${styles.text} ${isFinished ? "line-through opacity-60" : ""}`}>
+                    <p className={`font-semibold leading-tight ${styles.text} ${
+                        isMonthDesktop ? "text-[11px] truncate" : "text-xs sm:text-sm md:text-[15px] break-words"
+                    } ${isFinished ? "line-through opacity-60" : ""}`}>
                         {task.title}
                     </p>
                     {task.description && (
-                        <p className={`text-[10px] truncate mt-0.5 leading-snug ${styles.text} opacity-80 ${isFinished ? "line-through opacity-40" : ""}`}>
+                        <p className={`${styles.text} opacity-80 ${isFinished ? "line-through opacity-40" : ""} ${
+                            isMonthDesktop 
+                                ? "text-[10px] truncate mt-0.5 leading-snug" 
+                                : "text-[10px] sm:text-[13px] mt-1.5 leading-relaxed break-words whitespace-pre-wrap"
+                        }`}>
                             {task.description}
                         </p>
                     )}
                     {task.assignee && (
-                        <div className={`flex items-center space-x-1 mt-0.5 text-[10px] ${styles.text} opacity-70`}>
-                            <User className="h-2.5 w-2.5" />
+                        <div className={`flex items-center space-x-1.5 ${styles.text} opacity-70 ${
+                            isMonthDesktop ? "text-[9px] mt-0.5" : "text-[10px] sm:text-[12px] mt-2"
+                        }`}>
+                            <User className={isMonthDesktop ? "h-2 w-2" : "h-2.5 w-2.5 sm:h-3.5 sm:w-3.5"} />
                             <span className="truncate">{task.assignee}</span>
                         </div>
                     )}
                 </div>
-                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5 ${getPriorityColor(task.priority)}`} />
+                <div className={`rounded-full flex-shrink-0 ${
+                    isMonthDesktop ? "w-1.5 h-1.5 mt-1.5" : "w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 mt-1.5"
+                } ${getPriorityColor(task.priority)}`} />
             </div>
         );
     };
@@ -469,7 +483,7 @@ export default function CalendarPage() {
                                     
                                     {/* Desktop view: full task items */}
                                     <div className="hidden sm:block flex-1 overflow-y-auto space-y-1.5 max-h-[80px] sm:max-h-[100px] scrollbar-thin">
-                                        {dateTasks.map(renderTaskItem)}
+                                        {dateTasks.map(t => renderTaskItem(t, true))}
                                     </div>
 
                                     {/* Mobile view: task dots */}
@@ -510,7 +524,7 @@ export default function CalendarPage() {
                         {getTasksForDate(formatDateKey(currentDate)).length === 0 ? (
                             <p className="text-xs text-gray-400 text-center py-4">No tasks scheduled for this day.</p>
                         ) : (
-                            getTasksForDate(formatDateKey(currentDate)).map(renderTaskItem)
+                            getTasksForDate(formatDateKey(currentDate)).map(t => renderTaskItem(t, false))
                         )}
                     </div>
                 </div>
@@ -536,7 +550,7 @@ export default function CalendarPage() {
                             onDragOver={(e) => handleDragOver(e, dateStr)}
                             onDragLeave={handleDragLeave}
                             onDrop={(e) => handleDrop(e, dateStr)}
-                            className={`flex-1 flex flex-col p-4 space-y-3 min-h-0 md:min-h-[450px] transition-all rounded-xl md:rounded-none border md:border-0 bg-white ${
+                            className={`flex-1 flex flex-col p-2.5 sm:px-2 sm:py-3.5 space-y-2.5 min-h-0 md:min-h-[450px] transition-all rounded-xl md:rounded-none border md:border-0 bg-white ${
                                 isToday ? "bg-blue-50/15 border-blue-200" : "border-slate-100"
                             } ${isOver ? "ring-2 ring-blue-500 ring-inset bg-blue-50/40" : ""}`}
                         >
@@ -563,7 +577,7 @@ export default function CalendarPage() {
                                 {dateTasks.length === 0 ? (
                                     <p className="text-xs text-gray-400 text-center py-2 md:hidden">No tasks</p>
                                 ) : (
-                                    dateTasks.map(renderTaskItem)
+                                    dateTasks.map(t => renderTaskItem(t, false))
                                 )}
                             </div>
                         </div>
@@ -616,7 +630,7 @@ export default function CalendarPage() {
                                 <p className="text-xs mt-1">Drag tasks here or click Add Task to get started.</p>
                             </div>
                         ) : (
-                            dateTasks.map(renderTaskItem)
+                            dateTasks.map(t => renderTaskItem(t, false))
                         )}
                     </div>
                 </div>
@@ -627,7 +641,7 @@ export default function CalendarPage() {
     return (
         <div className="min-h-screen bg-gray-50/50 flex flex-col">
             <Navbar />
-            <main className="container mx-auto px-4 py-6 sm:py-8 flex-1 flex flex-col">
+            <main style={{ maxWidth: "1650px", width: "95%" }} className="mx-auto px-4 py-6 sm:py-8 flex-1 flex flex-col">
                 
                 {/* Control bar */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 space-y-4 md:space-y-0">

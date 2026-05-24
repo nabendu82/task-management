@@ -81,7 +81,7 @@ export default function Navbar({ boardTitle, onEditBoard, onFilterClick, filterC
     if (isCalendarPage) {
         return (
             <header className="bg-white border-b sticky top-0 z-50">
-                <div className="container mx-auto px-4 py-3 sm:py-4">
+                <div style={{ maxWidth: "1650px", width: "95%" }} className="mx-auto px-4 py-3 sm:py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
                             <Link href="/dashboard" className="flex items-center space-x-1 sm:space-x-2 text-gray-600 hover:text-gray-900 flex-shrink-0">
