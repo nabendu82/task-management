@@ -14,7 +14,7 @@ import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Board } from "@/lib/supabase/models";
-import { getBoardColorStyles } from "@/lib/utils";
+import { getBoardColorStyles, getNextBoardColor } from "@/lib/utils";
 
 export default function DashboardPage() {
     const { user } = useUser();
@@ -58,7 +58,7 @@ export default function DashboardPage() {
     const error = boardsError || calendarError;
 
     const handleCreateBoard = () => {
-        createBoard({ title: "New Board", description: "A new board", color: "#000000" })
+        createBoard({ title: "New Board", description: "A new board", color: getNextBoardColor(boards.length) })
     }
 
     if (error) {

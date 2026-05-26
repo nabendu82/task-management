@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useBoard } from "@/lib/hooks/useBoards";
 import { ColumnWithTasks, Task } from "@/lib/supabase/models";
+import { BOARD_COLOR_PALETTE } from "@/lib/utils";
 import { Calendar, MoreHorizontal, Plus, Pointer, User } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -414,12 +415,11 @@ export default function BoardPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label>Board Color</Label>
-                                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                                    {["bg-blue-500", "bg-green-500", "bg-yellow-500", "bg-red-500", "bg-purple-500", "bg-pink-500", "bg-indigo-500", "bg-gray-500",
-                                        "bg-orange-500", "bg-teal-500", "bg-cyan-500", "bg-emerald-500",].map((color, key) => (
-                                            <button key={key} type="button" className={`w-8 h-8 rounded-full ${color} ${color === newColor ? "ring-2 ring-offset-2 ring-gray-900" : ""}`}
-                                                onClick={() => setNewColor(color)} />
-                                        ))}
+                                <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                                    {BOARD_COLOR_PALETTE.map((color, key) => (
+                                        <button key={key} type="button" className={`w-8 h-8 rounded-full ${color} ${color === newColor ? "ring-2 ring-offset-2 ring-gray-900" : ""}`}
+                                            onClick={() => setNewColor(color)} />
+                                    ))}
                                 </div>
                             </div>
                             <div className="flex justify-end space-x-2">
