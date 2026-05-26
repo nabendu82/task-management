@@ -218,6 +218,7 @@ export default function BoardPage() {
 
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [newTitle, setNewTitle] = useState("");
+    const [newDescription, setNewDescription] = useState("");
     const [newColor, setNewColor] = useState("");
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [isCreatingColumn, setIsCreatingColumn] = useState(false);
@@ -247,7 +248,7 @@ export default function BoardPage() {
         if (!newTitle.trim() || !board) return;
 
         try {
-            await updateBoard(board.id, { title: newTitle.trim(), color: newColor || board.color });
+            await updateBoard(board.id, { title: newTitle.trim(), description: newDescription.trim() || null, color: newColor || board.color });
             setIsEditingTitle(false);
         } catch { }
     }
@@ -401,7 +402,7 @@ export default function BoardPage() {
     return (
         <>
             <div className="min-h-screen bg-gray-50">
-                <Navbar boardTitle={board?.title} onEditBoard={() => { setNewTitle(board?.title ?? ""); setNewColor(board?.color ?? ""); setIsEditingTitle(true); }}
+                <Navbar boardTitle={board?.title} onEditBoard={() => { setNewTitle(board?.title ?? ""); setNewDescription(board?.description ?? ""); setNewColor(board?.color ?? ""); setIsEditingTitle(true); }}
                     onFilterClick={() => setIsFilterOpen(true)} filterCount={Object.values(filters).reduce((count, v) => count + (Array.isArray(v) ? v.length : v !== null ? 1 : 0), 0)} />
                 <Dialog open={isEditingTitle} onOpenChange={setIsEditingTitle}>
                     <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
@@ -412,6 +413,10 @@ export default function BoardPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="boardTitle">Board Title</Label>
                                 <Input id="boardTitle" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Enter board title..." required />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="boardDescription">Board Description</Label>
+                                <Textarea id="boardDescription" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Enter a short description..." rows={2} />
                             </div>
                             <div className="space-y-2">
                                 <Label>Board Color</Label>
