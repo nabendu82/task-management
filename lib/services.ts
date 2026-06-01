@@ -1,5 +1,12 @@
-import { Board, Column, Task } from "@/lib/supabase/models";
+import { Board, Column, Task, TaskSeries, CreateTaskSeriesInput, UpdateTaskSeriesInput } from "@/lib/supabase/models";
 import { SupabaseClient } from "@supabase/supabase-js";
+import {
+    REPETITIVE_TASKS_BOARD_COLOR,
+    REPETITIVE_TASKS_BOARD_DESCRIPTION,
+    REPETITIVE_TASKS_BOARD_TITLE,
+    isRepetitiveTasksBoard,
+} from "@/lib/constants";
+import { generateOccurrenceDates } from "@/lib/seriesUtils";
 
 export const boardService = {
     async getBoard(supabase: SupabaseClient, boardId: string): Promise<Board> {
@@ -25,9 +32,19 @@ export const boardService = {
         return data || [];
     },
     async createBoard(supabase: SupabaseClient, board: Omit<Board, "id" | "created_at" | "updated_at">): Promise<Board> {
+        const payload: Record<string, unknown> = {
+            user_id: board.user_id,
+            title: board.title,
+            description: board.description,
+            color: board.color,
+        };
+        if (board.is_repetitive_board !== undefined) {
+            payload.is_repetitive_board = board.is_repetitive_board;
+        }
+
         const { data, error } = await supabase
             .from("boards")
-            .insert(board)
+            .insert(payload)
             .select()
             .single();
 
@@ -187,6 +204,71 @@ export const taskService = {
         if (error) throw error;
         return data;
     },
+    async markSeriesException(supabase: SupabaseClient, taskId: string): Promise<void> {
+        const { error } = await supabase
+            .from("tasks")
+            .update({ series_exception: true })
+            .eq("id", taskId);
+
+        if (error) {
+            if (error.code === "PGRST204" || error.message?.includes("series_exception")) {
+                return;
+            }
+            throw error;
+        }
+    },
+    async createTasks(
+        supabase: SupabaseClient,
+        tasks: Array<Omit<Task, "id" | "created_at">>
+    ): Promise<Task[]> {
+        if (tasks.length === 0) return [];
+
+        const payload = tasks.map(({ is_completed, ...task }) => task as Omit<Task, "id" | "created_at" | "is_completed">);
+
+        const { data, error } = await supabase
+            .from("tasks")
+            .insert(payload)
+            .select(`
+                *,
+                columns (
+                    board_id
+                )
+            `);
+
+        if (error) throw error;
+        return (data || []).map((task) => ({ ...task, is_completed: task.is_completed ?? false }));
+    },
+    async deleteSeriesTasks(supabase: SupabaseClient, seriesId: string, includeExceptions = false): Promise<void> {
+        let query = supabase.from("tasks").delete().eq("series_id", seriesId);
+        if (!includeExceptions) {
+            query = query.eq("series_exception", false);
+        }
+        const { error } = await query;
+        if (error) throw error;
+    },
+    async getTasksBySeries(supabase: SupabaseClient, seriesId: string): Promise<Task[]> {
+        const { data, error } = await supabase
+            .from("tasks")
+            .select("*")
+            .eq("series_id", seriesId)
+            .order("due_date", { ascending: true });
+
+        if (error) throw error;
+        return data || [];
+    },
+    async updateTasksBySeries(
+        supabase: SupabaseClient,
+        seriesId: string,
+        updates: Partial<Pick<Task, "title" | "description" | "assignee" | "priority">>
+    ): Promise<void> {
+        const { error } = await supabase
+            .from("tasks")
+            .update(updates)
+            .eq("series_id", seriesId)
+            .eq("series_exception", false);
+
+        if (error) throw error;
+    },
     async toggleTaskCompletion(supabase: SupabaseClient, taskId: string, isCompleted: boolean): Promise<Task | null> {
         // Try to update is_completed in the database.
         // If the column doesn't exist yet, silently return null
@@ -253,6 +335,155 @@ export const taskService = {
     },
 };
 
+export const seriesService = {
+    async getSeries(supabase: SupabaseClient, seriesId: string): Promise<TaskSeries> {
+        const { data, error } = await supabase
+            .from("task_series")
+            .select("*")
+            .eq("id", seriesId)
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+    async createSeries(
+        supabase: SupabaseClient,
+        userId: string,
+        input: CreateTaskSeriesInput
+    ): Promise<{ series: TaskSeries; tasks: Task[] }> {
+        const occurrenceDates = generateOccurrenceDates({
+            startDate: input.startDate,
+            weekdays: input.weekdays,
+            endType: input.endType,
+            occurrenceCount: input.occurrenceCount,
+            endDate: input.endDate || undefined,
+        });
+
+        if (occurrenceDates.length === 0) {
+            throw new Error("No occurrences generated. Check weekdays and end settings.");
+        }
+
+        const { data: series, error: seriesError } = await supabase
+            .from("task_series")
+            .insert({
+                user_id: userId,
+                column_id: input.columnId,
+                title: input.title,
+                description: input.description || null,
+                assignee: input.assignee || null,
+                priority: input.priority || "medium",
+                weekdays: input.weekdays,
+                start_date: input.startDate,
+                end_type: input.endType,
+                occurrence_count: input.endType === "count" ? input.occurrenceCount ?? null : null,
+                end_date: input.endType === "until" ? input.endDate ?? null : null,
+            })
+            .select()
+            .single();
+
+        if (seriesError) throw seriesError;
+
+        const tasksToCreate = occurrenceDates.map((dueDate, index) => ({
+            column_id: input.columnId,
+            title: input.title,
+            description: input.description || null,
+            assignee: input.assignee || null,
+            due_date: dueDate,
+            priority: input.priority || "medium",
+            sort_order: index,
+            series_id: series.id,
+            series_exception: false,
+        }));
+
+        const tasks = await taskService.createTasks(supabase, tasksToCreate);
+        return { series, tasks };
+    },
+    async updateSeries(
+        supabase: SupabaseClient,
+        seriesId: string,
+        input: UpdateTaskSeriesInput
+    ): Promise<{ series: TaskSeries; tasks: Task[] }> {
+        const existing = await seriesService.getSeries(supabase, seriesId);
+
+        const nextWeekdays = input.weekdays ?? existing.weekdays;
+        const nextStartDate = input.startDate ?? existing.start_date;
+        const nextEndType = input.endType ?? existing.end_type;
+        const nextOccurrenceCount = input.occurrenceCount ?? existing.occurrence_count ?? undefined;
+        const nextEndDate = input.endDate ?? existing.end_date ?? undefined;
+
+        const scheduleChanged = input.scheduleChanged || (
+            input.weekdays !== undefined ||
+            input.startDate !== undefined ||
+            input.endType !== undefined ||
+            input.occurrenceCount !== undefined ||
+            input.endDate !== undefined
+        );
+
+        const seriesUpdates: Record<string, unknown> = {
+            updated_at: new Date().toISOString(),
+        };
+
+        if (input.title !== undefined) seriesUpdates.title = input.title;
+        if (input.description !== undefined) seriesUpdates.description = input.description;
+        if (input.assignee !== undefined) seriesUpdates.assignee = input.assignee;
+        if (input.priority !== undefined) seriesUpdates.priority = input.priority;
+        if (input.columnId !== undefined) seriesUpdates.column_id = input.columnId;
+        if (input.weekdays !== undefined) seriesUpdates.weekdays = input.weekdays;
+        if (input.startDate !== undefined) seriesUpdates.start_date = input.startDate;
+        if (input.endType !== undefined) seriesUpdates.end_type = input.endType;
+        if (input.occurrenceCount !== undefined) seriesUpdates.occurrence_count = input.occurrenceCount;
+        if (input.endDate !== undefined) seriesUpdates.end_date = input.endDate;
+
+        const { data: series, error: seriesError } = await supabase
+            .from("task_series")
+            .update(seriesUpdates)
+            .eq("id", seriesId)
+            .select()
+            .single();
+
+        if (seriesError) throw seriesError;
+
+        if (scheduleChanged) {
+            await taskService.deleteSeriesTasks(supabase, seriesId, false);
+
+            const occurrenceDates = generateOccurrenceDates({
+                startDate: nextStartDate,
+                weekdays: nextWeekdays,
+                endType: nextEndType,
+                occurrenceCount: nextOccurrenceCount,
+                endDate: nextEndDate || undefined,
+            });
+
+            const tasks = await taskService.createTasks(
+                supabase,
+                occurrenceDates.map((dueDate, index) => ({
+                    column_id: input.columnId ?? existing.column_id,
+                    title: input.title ?? existing.title,
+                    description: input.description ?? existing.description,
+                    assignee: input.assignee ?? existing.assignee,
+                    due_date: dueDate,
+                    priority: input.priority ?? existing.priority,
+                    sort_order: index,
+                    series_id: seriesId,
+                    series_exception: false,
+                }))
+            );
+
+            return { series, tasks };
+        }
+
+        await taskService.updateTasksBySeries(supabase, seriesId, {
+            title: input.title ?? existing.title,
+            description: input.description ?? existing.description,
+            assignee: input.assignee ?? existing.assignee,
+            priority: input.priority ?? existing.priority,
+        });
+
+        const tasks = await taskService.getTasksBySeries(supabase, seriesId);
+        return { series, tasks };
+    },
+};
+
 export const boardDataService = {
     async getBoardWithColumns(supabase: SupabaseClient, boardId: string) {
         const [board, columns] = await Promise.all([boardService.getBoard(supabase, boardId), columnService.getColumns(supabase, boardId)]);
@@ -280,13 +511,31 @@ export const boardDataService = {
         description?: string;
         color?: string;
         userId: string;
+        isRepetitiveBoard?: boolean;
     }) {
-        const board = await boardService.createBoard(supabase, {
+        const boardPayload: Omit<Board, "id" | "created_at" | "updated_at"> = {
             user_id: boardData.userId,
             title: boardData.title,
             description: boardData.description || null,
-            color: boardData.color || "bg-blue-500"
-        })
+            color: boardData.color || "bg-blue-500",
+        };
+
+        if (boardData.isRepetitiveBoard) {
+            boardPayload.is_repetitive_board = true;
+        }
+
+        let board: Board;
+        try {
+            board = await boardService.createBoard(supabase, boardPayload);
+        } catch (err: any) {
+            if (boardData.isRepetitiveBoard && (err?.code === "PGRST204" || err?.message?.includes("is_repetitive_board"))) {
+                const { is_repetitive_board, ...fallbackPayload } = boardPayload;
+                board = await boardService.createBoard(supabase, fallbackPayload);
+            } else {
+                throw err;
+            }
+        }
+
         const defaultColumns = [
             { title: "To Do", sort_order: 0 },
             { title: "In Progress", sort_order: 1 },
@@ -296,6 +545,24 @@ export const boardDataService = {
 
         await Promise.all(defaultColumns.map(column => columnService.createColumn(supabase, { ...column, board_id: board.id, user_id: boardData.userId })));
         return board;
+    },
+    async createRepetitiveTasksBoard(supabase: SupabaseClient, userId: string): Promise<Board> {
+        return boardDataService.createBoardWithDefaultColumns(supabase, {
+            title: REPETITIVE_TASKS_BOARD_TITLE,
+            description: REPETITIVE_TASKS_BOARD_DESCRIPTION,
+            color: REPETITIVE_TASKS_BOARD_COLOR,
+            userId,
+            isRepetitiveBoard: true,
+        });
+    },
+    async ensureRepetitiveTasksBoard(supabase: SupabaseClient, userId: string): Promise<Board[]> {
+        const boards = await boardService.getBoards(supabase, userId);
+        if (boards.some(isRepetitiveTasksBoard)) {
+            return boards;
+        }
+
+        const repetitiveBoard = await boardDataService.createRepetitiveTasksBoard(supabase, userId);
+        return [repetitiveBoard, ...boards];
     }
 
 }

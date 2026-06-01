@@ -1,6 +1,7 @@
 "use client";
 
 import Navbar from "@/components/navbar";
+import SeriesSchedulerFields from "@/components/SeriesSchedulerFields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,17 +11,19 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useBoard } from "@/lib/hooks/useBoards";
-import { ColumnWithTasks, Task } from "@/lib/supabase/models";
+import { ColumnWithTasks, Task, TaskSeries } from "@/lib/supabase/models";
+import { isRepetitiveTasksBoard } from "@/lib/constants";
+import { DEFAULT_SERIES_WEEKDAYS, SeriesEndType } from "@/lib/seriesUtils";
 import { BOARD_COLOR_PALETTE } from "@/lib/utils";
 import { Calendar, MoreHorizontal, Plus, Pointer, User } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DndContext, DragEndEvent, DragOverEvent, DragOverlay, DragStartEvent, PointerSensor, rectIntersection, useDroppable, useSensor, useSensors, } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-function DroppableColumn({ column, children, onCreateTask, onEditColumn, isCreateTaskOpen, onCreateTaskOpenChange }:
-    { column: ColumnWithTasks; children: React.ReactNode; onCreateTask: (taskData: any) => Promise<void>; onEditColumn: (column: ColumnWithTasks) => void; isCreateTaskOpen: boolean; onCreateTaskOpenChange: (open: boolean) => void; }) {
+function DroppableColumn({ column, children, onCreateTask, onEditColumn, isCreateTaskOpen, onCreateTaskOpenChange, seriesFields, submitLabel }:
+    { column: ColumnWithTasks; children: React.ReactNode; onCreateTask: (taskData: any) => Promise<void>; onEditColumn: (column: ColumnWithTasks) => void; isCreateTaskOpen: boolean; onCreateTaskOpenChange: (open: boolean) => void; seriesFields?: React.ReactNode; submitLabel?: string; }) {
     const { setNodeRef, isOver } = useDroppable({ id: column.id });
     return (
         <div ref={setNodeRef} className={`w-full lg:flex-shrink-0 lg:w-80 ${isOver ? "bg-blue-50 rounded-lg" : ""}`}>
@@ -84,8 +87,9 @@ function DroppableColumn({ column, children, onCreateTask, onEditColumn, isCreat
                                     <Label>Due Date</Label>
                                     <Input type="date" id="dueDate" name="dueDate" />
                                 </div>
+                                {seriesFields}
                                 <div className="flex justify-end space-x-2 pt-4">
-                                    <Button type="submit">Create Task</Button>
+                                    <Button type="submit">{submitLabel || "Create Task"}</Button>
                                 </div>
                             </form>
                         </DialogContent>
@@ -214,7 +218,7 @@ function TaskOverlay({ task }: { task: Task }) {
 
 export default function BoardPage() {
     const { id } = useParams<{ id: string }>();
-    const { board, createColumn, updateBoard, columns, createRealTask, updateRealTask, setColumns, moveTask, updateColumn } = useBoard(id);
+    const { board, createColumn, updateBoard, columns, createRealTask, createTaskSeries, updateRealTask, updateTaskSeries, getTaskSeries, setColumns, moveTask, updateColumn } = useBoard(id);
 
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [newTitle, setNewTitle] = useState("");
@@ -231,7 +235,51 @@ export default function BoardPage() {
     const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
     const [createTaskColumnId, setCreateTaskColumnId] = useState<string | null>(null);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
-    
+    const [editScope, setEditScope] = useState<"choose" | "individual" | "series" | null>(null);
+    const [editingSeries, setEditingSeries] = useState<TaskSeries | null>(null);
+    const [isSeriesEnabled, setIsSeriesEnabled] = useState(false);
+    const [seriesWeekdays, setSeriesWeekdays] = useState<number[]>(DEFAULT_SERIES_WEEKDAYS);
+    const [seriesEndType, setSeriesEndType] = useState<SeriesEndType>("count");
+    const [seriesOccurrenceCount, setSeriesOccurrenceCount] = useState(30);
+    const [seriesEndDate, setSeriesEndDate] = useState("");
+    const [seriesStartDate, setSeriesStartDate] = useState("");
+
+    const isRepetitiveBoard = isRepetitiveTasksBoard(board);
+
+    function resetSeriesFields() {
+        setSeriesWeekdays(DEFAULT_SERIES_WEEKDAYS);
+        setSeriesEndType("count");
+        setSeriesOccurrenceCount(30);
+        setSeriesEndDate("");
+        setSeriesStartDate(new Date().toISOString().slice(0, 10));
+        setIsSeriesEnabled(isRepetitiveBoard);
+    }
+
+    useEffect(() => {
+        if (isRepetitiveBoard) {
+            resetSeriesFields();
+        }
+    }, [board?.id, isRepetitiveBoard]);
+
+    function renderSeriesSchedulerFields() {
+        if (!isRepetitiveBoard) return null;
+        return (
+            <SeriesSchedulerFields
+                enabled={isSeriesEnabled}
+                onEnabledChange={setIsSeriesEnabled}
+                weekdays={seriesWeekdays}
+                onWeekdaysChange={setSeriesWeekdays}
+                endType={seriesEndType}
+                onEndTypeChange={setSeriesEndType}
+                occurrenceCount={seriesOccurrenceCount}
+                onOccurrenceCountChange={setSeriesOccurrenceCount}
+                endDate={seriesEndDate}
+                onEndDateChange={setSeriesEndDate}
+            />
+        );
+    }
+
+    const createTaskSubmitLabel = isRepetitiveBoard && isSeriesEnabled ? "Create Series" : "Create Task";
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8, }, }));
 
@@ -253,6 +301,39 @@ export default function BoardPage() {
         } catch { }
     }
 
+    function closeEditDialog() {
+        setEditingTask(null);
+        setEditScope(null);
+        setEditingSeries(null);
+    }
+
+    async function openEditDialog(task: Task) {
+        setEditingTask(task);
+        if (task.series_id && !task.series_exception) {
+            setEditScope("choose");
+            setEditingSeries(null);
+        } else {
+            setEditScope("individual");
+            setEditingSeries(null);
+        }
+    }
+
+    async function startSeriesEdit(task: Task) {
+        if (!task.series_id) return;
+        try {
+            const series = await getTaskSeries(task.series_id);
+            setEditingSeries(series);
+            setEditScope("series");
+            setSeriesWeekdays(series.weekdays);
+            setSeriesEndType(series.end_type);
+            setSeriesOccurrenceCount(series.occurrence_count ?? 30);
+            setSeriesEndDate(series.end_date ?? "");
+        } catch (err) {
+            console.error("Failed to load task series:", err);
+            setEditScope("individual");
+        }
+    }
+
     async function handleUpdateTaskSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         if (!editingTask) return;
@@ -267,14 +348,57 @@ export default function BoardPage() {
         };
 
         if (updates.title) {
-            await updateRealTask(editingTask.id, updates);
-            setEditingTask(null);
+            if (editScope === "series" && editingTask.series_id && editingSeries) {
+                await updateTaskSeries(editingTask.series_id, {
+                    title: updates.title,
+                    description: updates.description,
+                    assignee: updates.assignee,
+                    priority: updates.priority,
+                    columnId: editingSeries.column_id,
+                    weekdays: seriesWeekdays,
+                    startDate: editingSeries.start_date,
+                    endType: seriesEndType,
+                    occurrenceCount: seriesOccurrenceCount,
+                    endDate: seriesEndDate || null,
+                    scheduleChanged:
+                        JSON.stringify(seriesWeekdays) !== JSON.stringify(editingSeries.weekdays) ||
+                        seriesEndType !== editingSeries.end_type ||
+                        seriesOccurrenceCount !== (editingSeries.occurrence_count ?? 30) ||
+                        (seriesEndDate || null) !== (editingSeries.end_date ?? null),
+                });
+            } else {
+                await updateRealTask(editingTask.id, updates, {
+                    detachFromSeries: !!editingTask.series_id && !editingTask.series_exception,
+                });
+            }
+            closeEditDialog();
         }
     }
 
-    async function createTask(taskData: { title: string; description?: string; assignee?: string; dueDate?: string; priority: "low" | "medium" | "high"; }) {
-        const targetColumn = columns[0];
+    async function createTask(taskData: { title: string; description?: string; assignee?: string; dueDate?: string; priority: "low" | "medium" | "high"; }, columnId?: string) {
+        const targetColumnId = columnId || createTaskColumnId || columns[0]?.id;
+        const targetColumn = columns.find((col) => col.id === targetColumnId) || columns[0];
         if (!targetColumn) throw new Error("No column available to add task");
+
+        if (isRepetitiveBoard && isSeriesEnabled) {
+            if (seriesWeekdays.length === 0) throw new Error("Select at least one weekday for the series.");
+            if (seriesEndType === "until" && !seriesEndDate) throw new Error("Select an end date for the series.");
+            const startDate = seriesStartDate || taskData.dueDate || new Date().toISOString().slice(0, 10);
+            await createTaskSeries({
+                columnId: targetColumn.id,
+                title: taskData.title,
+                description: taskData.description || null,
+                assignee: taskData.assignee || null,
+                priority: taskData.priority,
+                weekdays: seriesWeekdays,
+                startDate,
+                endType: seriesEndType,
+                occurrenceCount: seriesOccurrenceCount,
+                endDate: seriesEndDate || null,
+            });
+            return;
+        }
+
         await createRealTask(targetColumn.id, taskData);
     }
 
@@ -290,9 +414,10 @@ export default function BoardPage() {
         };
 
         if (taskData.title.trim()) {
-            await createTask(taskData);
+            await createTask(taskData, createTaskColumnId || undefined);
             setIsCreateTaskOpen(false);
             setCreateTaskColumnId(null);
+            resetSeriesFields();
         }
     }
 
@@ -478,8 +603,8 @@ export default function BoardPage() {
                             </div>
                         </div>
                         {/* Add task dialog */}
-                        <Dialog open={isCreateTaskOpen && createTaskColumnId === null} onOpenChange={(open) => { setIsCreateTaskOpen(open); if (!open) setCreateTaskColumnId(null); }}>
-                            <DialogTrigger render={<Button className="w-full sm:w-auto" onClick={() => { setCreateTaskColumnId(null); setIsCreateTaskOpen(true); }} />}>
+                        <Dialog open={isCreateTaskOpen && createTaskColumnId === null} onOpenChange={(open) => { setIsCreateTaskOpen(open); if (open) resetSeriesFields(); if (!open) setCreateTaskColumnId(null); }}>
+                            <DialogTrigger render={<Button className="w-full sm:w-auto" onClick={() => { setCreateTaskColumnId(null); setIsCreateTaskOpen(true); resetSeriesFields(); }} />}>
                                 <Plus /> Add Task
                             </DialogTrigger>
                             <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
@@ -518,11 +643,22 @@ export default function BoardPage() {
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Due Date</Label>
-                                        <Input type="date" id="dueDate" name="dueDate" />
+                                        <Label>{isRepetitiveBoard && isSeriesEnabled ? "Start Date" : "Due Date"}</Label>
+                                        {isRepetitiveBoard ? (
+                                            <Input
+                                                type="date"
+                                                id="dueDate"
+                                                name="dueDate"
+                                                value={seriesStartDate}
+                                                onChange={(e) => setSeriesStartDate(e.target.value)}
+                                            />
+                                        ) : (
+                                            <Input type="date" id="dueDate" name="dueDate" />
+                                        )}
                                     </div>
+                                    {renderSeriesSchedulerFields()}
                                     <div className="flex justify-end space-x-2 pt-4">
-                                        <Button type="submit">Create Task</Button>
+                                        <Button type="submit">{createTaskSubmitLabel}</Button>
                                     </div>
                                 </form>
                             </DialogContent>
@@ -535,10 +671,12 @@ export default function BoardPage() {
                             {filteredColumns.map((column, key) => (
                                 <DroppableColumn key={key} column={column} onCreateTask={handleCreateTask} onEditColumn={handleEditColumn}
                                     isCreateTaskOpen={isCreateTaskOpen && createTaskColumnId === column.id}
-                                    onCreateTaskOpenChange={(open) => { setIsCreateTaskOpen(open); if (open) setCreateTaskColumnId(column.id); else setCreateTaskColumnId(null); }}>
+                                    onCreateTaskOpenChange={(open) => { setIsCreateTaskOpen(open); if (open) { setCreateTaskColumnId(column.id); resetSeriesFields(); } else setCreateTaskColumnId(null); }}
+                                    seriesFields={renderSeriesSchedulerFields()}
+                                    submitLabel={createTaskSubmitLabel}>
                                     <SortableContext items={column.tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
                                         <div className="space-y-3">
-                                            {column.tasks.map((task, key) => (<SortableTask task={task} key={key} onEditTask={setEditingTask} />))}
+                                            {column.tasks.map((task, key) => (<SortableTask task={task} key={key} onEditTask={openEditDialog} />))}
                                         </div>
                                     </SortableContext>
                                 </DroppableColumn>
@@ -600,30 +738,71 @@ export default function BoardPage() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={editingTask !== null} onOpenChange={(open) => { if (!open) setEditingTask(null); }}>
+            <Dialog open={editingTask !== null} onOpenChange={(open) => { if (!open) closeEditDialog(); }}>
                 <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
-                    {editingTask && (
+                    {editingTask && editScope === "choose" && (
                         <>
                             <DialogHeader>
-                                <DialogTitle>Edit Task</DialogTitle>
-                                <p className="text-sm text-gray-600">Update task details</p>
+                                <DialogTitle>Edit Recurring Task</DialogTitle>
+                                <p className="text-sm text-gray-600">This task belongs to a series. What would you like to edit?</p>
                             </DialogHeader>
-                            <form className="space-y-4" onSubmit={handleUpdateTaskSubmit}>
+                            <div className="space-y-3 pt-2">
+                                <Button className="w-full justify-start" onClick={() => setEditScope("individual")}>
+                                    This task only
+                                </Button>
+                                <Button className="w-full justify-start" variant="outline" onClick={() => startSeriesEdit(editingTask)}>
+                                    Entire series
+                                </Button>
+                                <div className="flex justify-end pt-2">
+                                    <Button type="button" variant="outline" onClick={closeEditDialog}>Cancel</Button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                    {editingTask && editScope !== "choose" && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>{editScope === "series" ? "Edit Series" : "Edit Task"}</DialogTitle>
+                                <p className="text-sm text-gray-600">
+                                    {editScope === "series" ? "Update the recurring schedule and task details" : "Update task details"}
+                                </p>
+                            </DialogHeader>
+                            <form className="space-y-4" onSubmit={handleUpdateTaskSubmit} key={`${editingTask.id}-${editScope}`}>
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-title">Title *</Label>
-                                    <Input id="edit-title" name="title" defaultValue={editingTask.title} placeholder="Enter task title" required />
+                                    <Input
+                                        id="edit-title"
+                                        name="title"
+                                        defaultValue={editScope === "series" && editingSeries ? editingSeries.title : editingTask.title}
+                                        placeholder="Enter task title"
+                                        required
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-description">Description</Label>
-                                    <Textarea id="edit-description" name="description" defaultValue={editingTask.description || ""} placeholder="Enter task description" rows={3} />
+                                    <Textarea
+                                        id="edit-description"
+                                        name="description"
+                                        defaultValue={editScope === "series" && editingSeries ? editingSeries.description || "" : editingTask.description || ""}
+                                        placeholder="Enter task description"
+                                        rows={3}
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="edit-assignee">Assignee</Label>
-                                    <Input id="edit-assignee" name="assignee" defaultValue={editingTask.assignee || ""} placeholder="Who should do this?" />
+                                    <Input
+                                        id="edit-assignee"
+                                        name="assignee"
+                                        defaultValue={editScope === "series" && editingSeries ? editingSeries.assignee || "" : editingTask.assignee || ""}
+                                        placeholder="Who should do this?"
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Priority</Label>
-                                    <Select name="priority" defaultValue={editingTask.priority}>
+                                    <Select
+                                        name="priority"
+                                        defaultValue={editScope === "series" && editingSeries ? editingSeries.priority : editingTask.priority}
+                                    >
                                         <SelectTrigger>
                                             <SelectValue>
                                                 {(value) => value ? value.charAt(0).toUpperCase() + value.slice(1) : undefined}
@@ -638,13 +817,29 @@ export default function BoardPage() {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="edit-dueDate">Due Date</Label>
-                                    <Input type="date" id="edit-dueDate" name="dueDate" defaultValue={editingTask.due_date || ""} />
-                                </div>
+                                {editScope === "individual" && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="edit-dueDate">Due Date</Label>
+                                        <Input type="date" id="edit-dueDate" name="dueDate" defaultValue={editingTask.due_date || ""} />
+                                    </div>
+                                )}
+                                {editScope === "series" && (
+                                    <SeriesSchedulerFields
+                                        enabled
+                                        showToggle={false}
+                                        weekdays={seriesWeekdays}
+                                        onWeekdaysChange={setSeriesWeekdays}
+                                        endType={seriesEndType}
+                                        onEndTypeChange={setSeriesEndType}
+                                        occurrenceCount={seriesOccurrenceCount}
+                                        onOccurrenceCountChange={setSeriesOccurrenceCount}
+                                        endDate={seriesEndDate}
+                                        onEndDateChange={setSeriesEndDate}
+                                    />
+                                )}
                                 <div className="flex justify-end space-x-2 pt-4">
-                                    <Button type="button" variant="outline" onClick={() => setEditingTask(null)}>Cancel</Button>
-                                    <Button type="submit">Update Task</Button>
+                                    <Button type="button" variant="outline" onClick={closeEditDialog}>Cancel</Button>
+                                    <Button type="submit">{editScope === "series" ? "Update Series" : "Update Task"}</Button>
                                 </div>
                             </form>
                         </>

@@ -2,8 +2,8 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
-import { Task, Board, Column } from "../supabase/models";
-import { taskService, boardService, columnService } from "../services";
+import { Task, Board, Column, CreateTaskSeriesInput, UpdateTaskSeriesInput } from "../supabase/models";
+import { taskService, columnService, boardDataService, seriesService } from "../services";
 import { useSupabase } from "../supabase/SupabaseProvider";
 
 export function useCalendar() {
@@ -27,7 +27,7 @@ export function useCalendar() {
             setError(null);
             
             // Get user boards
-            const userBoards = await boardService.getBoards(supabase, user.id);
+            const userBoards = await boardDataService.ensureRepetitiveTasksBoard(supabase, user.id);
             setBoards(userBoards);
 
             // Get user tasks and default is_completed to false if missing
@@ -113,6 +113,21 @@ export function useCalendar() {
                 due_date: t.id.toString() === draggedTaskId.toString() ? targetDateStr : undefined
             }));
             await taskService.reorderTasks(supabase, taskOrders);
+
+            if (
+                draggedTask.series_id &&
+                !draggedTask.series_exception &&
+                draggedTask.due_date !== targetDateStr
+            ) {
+                await taskService.markSeriesException(supabase, draggedTaskId);
+                setTasks((prev) =>
+                    prev.map((t) =>
+                        t.id.toString() === draggedTaskId.toString()
+                            ? { ...t, series_exception: true }
+                            : t
+                    )
+                );
+            }
         } catch (err) {
             console.error("Failed to persist task reordering:", err);
             // Revert state on failure
@@ -178,6 +193,70 @@ export function useCalendar() {
         }
     }
 
+    async function createTaskSeries(seriesInput: CreateTaskSeriesInput) {
+        if (!user || !supabase) return;
+        try {
+            const { tasks: newTasks } = await seriesService.createSeries(supabase, user.id, seriesInput);
+            setTasks((prev) => [
+                ...prev,
+                ...newTasks.map((task) => ({ ...task, is_completed: task.is_completed ?? false })),
+            ]);
+            return newTasks;
+        } catch (err) {
+            console.error("Failed to create task series:", err);
+            throw err;
+        }
+    }
+
+    async function updateTask(taskId: string, updates: Partial<Task>, options?: { detachFromSeries?: boolean }) {
+        if (!supabase) return;
+        const originalTasks = [...tasks];
+        const payload = options?.detachFromSeries
+            ? { ...updates, series_exception: true }
+            : updates;
+        setTasks((prev) =>
+            prev.map((t) => (t.id.toString() === taskId.toString() ? { ...t, ...payload } : t))
+        );
+        try {
+            const updatedTask = await taskService.updateTask(supabase, taskId, payload);
+            setTasks((prev) =>
+                prev.map((t) => (t.id.toString() === taskId.toString() ? { ...t, ...updatedTask } : t))
+            );
+            return updatedTask;
+        } catch (err) {
+            console.error("Failed to update task:", err);
+            setTasks(originalTasks);
+            throw err;
+        }
+    }
+
+    async function updateTaskSeries(seriesId: string, updates: UpdateTaskSeriesInput) {
+        if (!supabase) return;
+        const originalTasks = [...tasks];
+        try {
+            const { tasks: updatedTasks } = await seriesService.updateSeries(supabase, seriesId, updates);
+            const exceptionTasks = originalTasks.filter(
+                (task) => task.series_id === seriesId && task.series_exception
+            );
+            const remainingTasks = originalTasks.filter((task) => task.series_id !== seriesId);
+            setTasks([
+                ...remainingTasks,
+                ...exceptionTasks,
+                ...updatedTasks.map((task) => ({ ...task, is_completed: task.is_completed ?? false })),
+            ]);
+            return updatedTasks;
+        } catch (err) {
+            console.error("Failed to update task series:", err);
+            setTasks(originalTasks);
+            throw err;
+        }
+    }
+
+    async function getTaskSeries(seriesId: string) {
+        if (!supabase) throw new Error("Supabase client not ready");
+        return seriesService.getSeries(supabase, seriesId);
+    }
+
     return {
         tasks,
         boards,
@@ -187,7 +266,11 @@ export function useCalendar() {
         reorderCalendarTasks,
         toggleTaskCompletion,
         createTaskOnCalendar,
+        createTaskSeries,
         getColumnsForBoard,
+        updateTask,
+        updateTaskSeries,
+        getTaskSeries,
         refresh: loadCalendarData
     };
 }

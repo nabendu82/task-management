@@ -2,8 +2,8 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
-import { Board, Column, ColumnWithTasks, Task } from "../supabase/models";
-import { boardDataService, boardService, columnService, taskService } from "../services";
+import { Board, Column, ColumnWithTasks, Task, CreateTaskSeriesInput, UpdateTaskSeriesInput } from "../supabase/models";
+import { boardDataService, boardService, columnService, taskService, seriesService } from "../services";
 import { useSupabase } from "../supabase/SupabaseProvider";
 
 export function useBoards() {
@@ -22,7 +22,7 @@ export function useBoards() {
         try {
             setLoading(true);
             setError(null);
-            const data = await boardService.getBoards(supabase!, user.id);
+            const data = await boardDataService.ensureRepetitiveTasksBoard(supabase!, user.id);
             setBoards(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load boards.");
@@ -109,9 +109,30 @@ export function useBoard(boardId: string) {
         }
     }
 
-    async function updateRealTask(taskId: string, updates: Partial<Task>) {
+    async function createTaskSeries(seriesInput: CreateTaskSeriesInput) {
+        if (!user) return;
         try {
-            const updatedTask = await taskService.updateTask(supabase!, taskId, updates);
+            const { tasks: newTasks } = await seriesService.createSeries(supabase!, user.id, seriesInput);
+            setColumns((prev) =>
+                prev.map((col) => {
+                    const columnTasks = newTasks.filter((task) => task.column_id === col.id);
+                    if (columnTasks.length === 0) return col;
+                    return { ...col, tasks: [...col.tasks, ...columnTasks] };
+                })
+            );
+            return newTasks;
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to create task series.");
+            throw err;
+        }
+    }
+
+    async function updateRealTask(taskId: string, updates: Partial<Task>, options?: { detachFromSeries?: boolean }) {
+        try {
+            const payload = options?.detachFromSeries
+                ? { ...updates, series_exception: true }
+                : updates;
+            const updatedTask = await taskService.updateTask(supabase!, taskId, payload);
             setColumns((prev) => 
                 prev.map((col) => ({
                     ...col,
@@ -123,6 +144,35 @@ export function useBoard(boardId: string) {
             setError(err instanceof Error ? err.message : "Failed to update task.");
             throw err;
         }
+    }
+
+    async function updateTaskSeries(seriesId: string, updates: UpdateTaskSeriesInput) {
+        try {
+            const { tasks: updatedTasks } = await seriesService.updateSeries(supabase!, seriesId, updates);
+            setColumns((prev) =>
+                prev.map((col) => ({
+                    ...col,
+                    tasks: [
+                        ...col.tasks.filter((task) => task.series_id !== seriesId || task.series_exception),
+                        ...updatedTasks.filter((task) => task.column_id === col.id),
+                    ].sort((a, b) => {
+                        if (!a.due_date && !b.due_date) return a.sort_order - b.sort_order;
+                        if (!a.due_date) return 1;
+                        if (!b.due_date) return -1;
+                        const dateCompare = a.due_date.localeCompare(b.due_date);
+                        return dateCompare !== 0 ? dateCompare : a.sort_order - b.sort_order;
+                    }),
+                }))
+            );
+            return updatedTasks;
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to update task series.");
+            throw err;
+        }
+    }
+
+    async function getTaskSeries(seriesId: string) {
+        return seriesService.getSeries(supabase!, seriesId);
     }
 
     async function createColumn(title: string) {
@@ -174,5 +224,5 @@ export function useBoard(boardId: string) {
         }
     }
 
-    return { board, columns, loading, error, updateBoard, createRealTask, updateRealTask, createColumn, setColumns, moveTask, updateColumn }
+    return { board, columns, loading, error, updateBoard, createRealTask, createTaskSeries, updateRealTask, updateTaskSeries, getTaskSeries, createColumn, setColumns, moveTask, updateColumn, refresh: loadBoard }
 }

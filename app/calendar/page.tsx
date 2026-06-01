@@ -1,6 +1,7 @@
 "use client";
 
 import Navbar from "@/components/navbar";
+import SeriesSchedulerFields from "@/components/SeriesSchedulerFields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,10 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useCalendar } from "@/lib/hooks/useCalendar";
-import { Task, Column } from "@/lib/supabase/models";
+import { Task, Column, TaskSeries } from "@/lib/supabase/models";
+import { getRepetitiveTasksBoard, isRepetitiveTasksBoard } from "@/lib/constants";
+import { DEFAULT_SERIES_WEEKDAYS, SeriesEndType } from "@/lib/seriesUtils";
 import { getBoardColorStyles } from "@/lib/utils";
 import { 
-    Calendar as CalendarIcon, 
     ChevronLeft, 
     ChevronRight, 
     Plus, 
@@ -24,7 +26,8 @@ import {
     ListTodo,
     Loader2,
     Eye,
-    EyeOff
+    EyeOff,
+    MoreHorizontal
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -40,7 +43,11 @@ export default function CalendarPage() {
         reorderCalendarTasks,
         toggleTaskCompletion,
         createTaskOnCalendar,
-        getColumnsForBoard
+        createTaskSeries,
+        getColumnsForBoard,
+        updateTask,
+        updateTaskSeries,
+        getTaskSeries
     } = useCalendar();
 
     // Calendar navigation states
@@ -66,6 +73,14 @@ export default function CalendarPage() {
     const [formDescription, setFormDescription] = useState("");
     const [formAssignee, setFormAssignee] = useState("");
     const [formPriority, setFormPriority] = useState<"low" | "medium" | "high">("medium");
+    const [editingTask, setEditingTask] = useState<Task | null>(null);
+    const [editScope, setEditScope] = useState<"choose" | "individual" | "series" | null>(null);
+    const [editingSeries, setEditingSeries] = useState<TaskSeries | null>(null);
+    const [isSeriesEnabled, setIsSeriesEnabled] = useState(false);
+    const [seriesWeekdays, setSeriesWeekdays] = useState<number[]>(DEFAULT_SERIES_WEEKDAYS);
+    const [seriesEndType, setSeriesEndType] = useState<SeriesEndType>("count");
+    const [seriesOccurrenceCount, setSeriesOccurrenceCount] = useState(30);
+    const [seriesEndDate, setSeriesEndDate] = useState("");
 
     // Load columns when target board changes
     useEffect(() => {
@@ -80,9 +95,11 @@ export default function CalendarPage() {
     // Pre-populate board selection when opening dialog
     useEffect(() => {
         if (isCreateOpen && boards.length > 0 && !formBoardId) {
-            setFormBoardId(boards[0].id.toString());
+            const repetitiveBoard = getRepetitiveTasksBoard(boards);
+            setFormBoardId((repetitiveBoard ?? boards[0]).id.toString());
+            setIsSeriesEnabled(!!repetitiveBoard);
         }
-    }, [isCreateOpen, boards]);
+    }, [isCreateOpen, boards, formBoardId]);
 
     async function loadColumns(boardId: string) {
         setColumnsLoading(true);
@@ -242,8 +259,100 @@ export default function CalendarPage() {
         setFormPriority("medium");
         setFormError(null);
         setFormSubmitting(false);
+        setSeriesWeekdays(DEFAULT_SERIES_WEEKDAYS);
+        setSeriesEndType("count");
+        setSeriesOccurrenceCount(30);
+        setSeriesEndDate("");
+        const repetitiveBoard = getRepetitiveTasksBoard(boards);
+        if (repetitiveBoard) {
+            setFormBoardId(repetitiveBoard.id.toString());
+            setIsSeriesEnabled(true);
+        } else {
+            setIsSeriesEnabled(false);
+        }
         setIsCreateOpen(true);
     };
+
+    function closeEditDialog() {
+        setEditingTask(null);
+        setEditScope(null);
+        setEditingSeries(null);
+    }
+
+    async function openEditDialog(task: Task) {
+        setEditingTask(task);
+        if (task.series_id && !task.series_exception) {
+            setEditScope("choose");
+            setEditingSeries(null);
+        } else {
+            setEditScope("individual");
+            setEditingSeries(null);
+        }
+    }
+
+    async function startSeriesEdit(task: Task) {
+        if (!task.series_id) return;
+        try {
+            const series = await getTaskSeries(task.series_id);
+            setEditingSeries(series);
+            setEditScope("series");
+            setSeriesWeekdays(series.weekdays);
+            setSeriesEndType(series.end_type);
+            setSeriesOccurrenceCount(series.occurrence_count ?? 30);
+            setSeriesEndDate(series.end_date ?? "");
+        } catch (err) {
+            console.error("Failed to load task series:", err);
+            setEditScope("individual");
+        }
+    }
+
+    const selectedCreateBoard = boards.find((b) => b.id.toString() === formBoardId);
+    const showSeriesFields = isRepetitiveTasksBoard(selectedCreateBoard);
+
+    async function handleUpdateTaskSubmit(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
+        if (!editingTask) return;
+
+        const formData = new FormData(e.currentTarget);
+        const updates = {
+            title: (formData.get("title") as string).trim(),
+            description: (formData.get("description") as string)?.trim() || null,
+            assignee: (formData.get("assignee") as string)?.trim() || null,
+            due_date: (formData.get("dueDate") as string) || null,
+            priority: (formData.get("priority") as "low" | "medium" | "high") || "medium",
+        };
+
+        if (!updates.title) return;
+
+        try {
+            if (editScope === "series" && editingTask.series_id && editingSeries) {
+                await updateTaskSeries(editingTask.series_id, {
+                    title: updates.title,
+                    description: updates.description,
+                    assignee: updates.assignee,
+                    priority: updates.priority,
+                    columnId: editingSeries.column_id,
+                    weekdays: seriesWeekdays,
+                    startDate: editingSeries.start_date,
+                    endType: seriesEndType,
+                    occurrenceCount: seriesOccurrenceCount,
+                    endDate: seriesEndDate || null,
+                    scheduleChanged:
+                        JSON.stringify(seriesWeekdays) !== JSON.stringify(editingSeries.weekdays) ||
+                        seriesEndType !== editingSeries.end_type ||
+                        seriesOccurrenceCount !== (editingSeries.occurrence_count ?? 30) ||
+                        (seriesEndDate || null) !== (editingSeries.end_date ?? null),
+                });
+            } else {
+                await updateTask(editingTask.id, updates, {
+                    detachFromSeries: !!editingTask.series_id && !editingTask.series_exception,
+                });
+            }
+            closeEditDialog();
+        } catch (err) {
+            console.error("Failed to update task:", err);
+        }
+    }
 
     const handleCreateTask = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -253,14 +362,37 @@ export default function CalendarPage() {
         setFormSubmitting(true);
         setFormError(null);
         try {
-            await createTaskOnCalendar({
-                title: formTitle,
-                description: formDescription,
-                assignee: formAssignee,
-                dueDate: createTargetDate,
-                priority: formPriority,
-                columnId: formColumnId
-            });
+            if (isSeriesEnabled && showSeriesFields) {
+                if (seriesWeekdays.length === 0) {
+                    setFormError("Select at least one weekday for the series.");
+                    return;
+                }
+                if (seriesEndType === "until" && !seriesEndDate) {
+                    setFormError("Select an end date for the series.");
+                    return;
+                }
+                await createTaskSeries({
+                    columnId: formColumnId,
+                    title: formTitle.trim(),
+                    description: formDescription.trim() || null,
+                    assignee: formAssignee.trim() || null,
+                    priority: formPriority,
+                    weekdays: seriesWeekdays,
+                    startDate: createTargetDate,
+                    endType: seriesEndType,
+                    occurrenceCount: seriesOccurrenceCount,
+                    endDate: seriesEndDate || null,
+                });
+            } else {
+                await createTaskOnCalendar({
+                    title: formTitle,
+                    description: formDescription,
+                    assignee: formAssignee,
+                    dueDate: createTargetDate,
+                    priority: formPriority,
+                    columnId: formColumnId
+                });
+            }
             setIsCreateOpen(false);
         } catch (err: any) {
             console.error("Task creation failed:", err);
@@ -352,11 +484,26 @@ export default function CalendarPage() {
                     )}
                 </button>
                 <div className="min-w-0 flex-1">
-                    <p className={`font-semibold leading-tight ${styles.text} ${
-                        isMonthDesktop ? "text-[11px] truncate" : "text-xs sm:text-sm md:text-[15px] break-words"
-                    } ${isFinished ? "line-through opacity-60" : ""}`}>
-                        {task.title}
-                    </p>
+                    <div className="flex items-start justify-between gap-1">
+                        <p className={`font-semibold leading-tight flex-1 min-w-0 ${styles.text} ${
+                            isMonthDesktop ? "text-[11px] truncate" : "text-xs sm:text-sm md:text-[15px] break-words"
+                        } ${isFinished ? "line-through opacity-60" : ""}`}>
+                            {task.title}
+                        </p>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className={`flex-shrink-0 p-0 hover:bg-transparent ${isMonthDesktop ? "h-5 w-5" : "h-7 w-7"}`}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                openEditDialog(task);
+                            }}
+                        >
+                            <MoreHorizontal className={`${styles.text} opacity-60 hover:opacity-100 ${isMonthDesktop ? "h-3 w-3" : "h-4 w-4"}`} />
+                        </Button>
+                    </div>
                     {task.description && (
                         <p className={`${styles.text} opacity-80 ${isFinished ? "line-through opacity-40" : ""} ${
                             isMonthDesktop 
@@ -845,7 +992,7 @@ export default function CalendarPage() {
 
                         {/* Due Date */}
                         <div className="space-y-1.5">
-                            <Label htmlFor="taskDueDate">Due Date</Label>
+                            <Label htmlFor="taskDueDate">{isSeriesEnabled && showSeriesFields ? "Start Date" : "Due Date"}</Label>
                             <Input 
                                 id="taskDueDate" 
                                 type="date" 
@@ -854,6 +1001,21 @@ export default function CalendarPage() {
                             />
                         </div>
 
+                        {showSeriesFields && (
+                            <SeriesSchedulerFields
+                                enabled={isSeriesEnabled}
+                                onEnabledChange={setIsSeriesEnabled}
+                                weekdays={seriesWeekdays}
+                                onWeekdaysChange={setSeriesWeekdays}
+                                endType={seriesEndType}
+                                onEndTypeChange={setSeriesEndType}
+                                occurrenceCount={seriesOccurrenceCount}
+                                onOccurrenceCountChange={setSeriesOccurrenceCount}
+                                endDate={seriesEndDate}
+                                onEndDateChange={setSeriesEndDate}
+                            />
+                        )}
+
                         {/* Form Submission */}
                         <div className="flex justify-end space-x-2 pt-4 border-t">
                             <Button variant="outline" type="button" onClick={() => setIsCreateOpen(false)} disabled={formSubmitting}>
@@ -861,12 +1023,122 @@ export default function CalendarPage() {
                             </Button>
                             <Button 
                                 type="submit" 
-                                disabled={!formTitle.trim() || !formColumnId || formSubmitting}
+                                disabled={!formTitle.trim() || !formColumnId || formSubmitting || (isSeriesEnabled && showSeriesFields && seriesWeekdays.length === 0)}
                             >
-                                {formSubmitting ? "Adding..." : "Add Task"}
+                                {formSubmitting ? "Adding..." : isSeriesEnabled && showSeriesFields ? "Create Series" : "Add Task"}
                             </Button>
                         </div>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Task Edit Dialog */}
+            <Dialog open={editingTask !== null} onOpenChange={(open) => { if (!open) closeEditDialog(); }}>
+                <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
+                    {editingTask && editScope === "choose" && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>Edit Recurring Task</DialogTitle>
+                                <p className="text-sm text-gray-600">This task belongs to a series. What would you like to edit?</p>
+                            </DialogHeader>
+                            <div className="space-y-3 pt-2">
+                                <Button className="w-full justify-start" onClick={() => setEditScope("individual")}>
+                                    This task only
+                                </Button>
+                                <Button className="w-full justify-start" variant="outline" onClick={() => startSeriesEdit(editingTask)}>
+                                    Entire series
+                                </Button>
+                                <div className="flex justify-end pt-2">
+                                    <Button type="button" variant="outline" onClick={closeEditDialog}>Cancel</Button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                    {editingTask && editScope !== "choose" && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>{editScope === "series" ? "Edit Series" : "Edit Task"}</DialogTitle>
+                                <p className="text-sm text-gray-600">
+                                    {editScope === "series" ? "Update the recurring schedule and task details" : "Update task details"}
+                                </p>
+                            </DialogHeader>
+                            <form className="space-y-4" onSubmit={handleUpdateTaskSubmit} key={`${editingTask.id}-${editScope}`}>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-title">Title *</Label>
+                                    <Input
+                                        id="edit-title"
+                                        name="title"
+                                        defaultValue={editScope === "series" && editingSeries ? editingSeries.title : editingTask.title}
+                                        placeholder="Enter task title"
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-description">Description</Label>
+                                    <Textarea
+                                        id="edit-description"
+                                        name="description"
+                                        defaultValue={editScope === "series" && editingSeries ? editingSeries.description || "" : editingTask.description || ""}
+                                        placeholder="Enter task description"
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-assignee">Assignee</Label>
+                                    <Input
+                                        id="edit-assignee"
+                                        name="assignee"
+                                        defaultValue={editScope === "series" && editingSeries ? editingSeries.assignee || "" : editingTask.assignee || ""}
+                                        placeholder="Who should do this?"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Priority</Label>
+                                    <Select
+                                        name="priority"
+                                        defaultValue={editScope === "series" && editingSeries ? editingSeries.priority : editingTask.priority}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue>
+                                                {(value) => value ? value.charAt(0).toUpperCase() + value.slice(1) : undefined}
+                                            </SelectValue>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {["low", "medium", "high"].map((priority) => (
+                                                <SelectItem key={priority} value={priority}>
+                                                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {editScope === "individual" && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="edit-dueDate">Due Date</Label>
+                                        <Input type="date" id="edit-dueDate" name="dueDate" defaultValue={editingTask.due_date || ""} />
+                                    </div>
+                                )}
+                                {editScope === "series" && (
+                                    <SeriesSchedulerFields
+                                        enabled
+                                        showToggle={false}
+                                        weekdays={seriesWeekdays}
+                                        onWeekdaysChange={setSeriesWeekdays}
+                                        endType={seriesEndType}
+                                        onEndTypeChange={setSeriesEndType}
+                                        occurrenceCount={seriesOccurrenceCount}
+                                        onOccurrenceCountChange={setSeriesOccurrenceCount}
+                                        endDate={seriesEndDate}
+                                        onEndDateChange={setSeriesEndDate}
+                                    />
+                                )}
+                                <div className="flex justify-end space-x-2 pt-4">
+                                    <Button type="button" variant="outline" onClick={closeEditDialog}>Cancel</Button>
+                                    <Button type="submit">{editScope === "series" ? "Update Series" : "Update Task"}</Button>
+                                </div>
+                            </form>
+                        </>
+                    )}
                 </DialogContent>
             </Dialog>
         </div>
