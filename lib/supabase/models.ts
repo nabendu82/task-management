@@ -45,7 +45,9 @@ export interface TaskSeries {
     description: string | null;
     assignee: string | null;
     priority: "low" | "medium" | "high";
+    recurrence_type: "weekly" | "monthly";
     weekdays: number[];
+    month_day: number | null;
     start_date: string;
     end_type: "count" | "until";
     occurrence_count: number | null;
@@ -60,7 +62,9 @@ export type CreateTaskSeriesInput = {
     description?: string | null;
     assignee?: string | null;
     priority?: "low" | "medium" | "high";
+    recurrenceType: "weekly" | "monthly";
     weekdays: number[];
+    monthDay?: number | null;
     startDate: string;
     endType: "count" | "until";
     occurrenceCount?: number;

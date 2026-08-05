@@ -7,11 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { WEEKDAY_LABELS } from "@/lib/constants";
 import { SeriesEndType } from "@/lib/seriesUtils";
 
+type RecurrenceType = "weekly" | "monthly";
+
 type SeriesSchedulerFieldsProps = {
     enabled: boolean;
     onEnabledChange?: (enabled: boolean) => void;
+    recurrenceType: RecurrenceType;
+    onRecurrenceTypeChange: (type: RecurrenceType) => void;
     weekdays: number[];
     onWeekdaysChange: (weekdays: number[]) => void;
+    monthDay: number;
+    onMonthDayChange: (day: number) => void;
     endType: SeriesEndType;
     onEndTypeChange: (endType: SeriesEndType) => void;
     occurrenceCount: number;
@@ -24,8 +30,12 @@ type SeriesSchedulerFieldsProps = {
 export default function SeriesSchedulerFields({
     enabled,
     onEnabledChange,
+    recurrenceType,
+    onRecurrenceTypeChange,
     weekdays,
     onWeekdaysChange,
+    monthDay,
+    onMonthDayChange,
     endType,
     onEndTypeChange,
     occurrenceCount,
@@ -46,13 +56,17 @@ export default function SeriesSchedulerFields({
         onWeekdaysChange([0, 1, 2, 3, 4, 5, 6]);
     }
 
+    const subtitle = recurrenceType === "monthly"
+        ? "Repeat on the same day each month"
+        : "Repeat on selected days of the week";
+
     if (showToggle && onEnabledChange) {
         return (
             <div className="space-y-3 rounded-lg border border-violet-200 bg-violet-50/50 p-3">
                 <div className="flex items-center justify-between gap-3">
                     <div>
                         <Label className="text-sm font-semibold text-violet-950">Recurring series</Label>
-                        <p className="text-xs text-violet-700/80 mt-0.5">Repeat on selected days of the week</p>
+                        <p className="text-xs text-violet-700/80 mt-0.5">{subtitle}</p>
                     </div>
                     <Button
                         type="button"
@@ -65,9 +79,13 @@ export default function SeriesSchedulerFields({
                 </div>
                 {enabled && (
                     <SeriesSchedulerBody
+                        recurrenceType={recurrenceType}
+                        onRecurrenceTypeChange={onRecurrenceTypeChange}
                         weekdays={weekdays}
                         toggleWeekday={toggleWeekday}
                         selectEveryDay={selectEveryDay}
+                        monthDay={monthDay}
+                        onMonthDayChange={onMonthDayChange}
                         endType={endType}
                         onEndTypeChange={onEndTypeChange}
                         occurrenceCount={occurrenceCount}
@@ -86,12 +104,16 @@ export default function SeriesSchedulerFields({
         <div className="space-y-3 rounded-lg border border-violet-200 bg-violet-50/50 p-3">
             <div>
                 <Label className="text-sm font-semibold text-violet-950">Series schedule</Label>
-                <p className="text-xs text-violet-700/80 mt-0.5">Repeat on selected days of the week</p>
+                <p className="text-xs text-violet-700/80 mt-0.5">{subtitle}</p>
             </div>
             <SeriesSchedulerBody
+                recurrenceType={recurrenceType}
+                onRecurrenceTypeChange={onRecurrenceTypeChange}
                 weekdays={weekdays}
                 toggleWeekday={toggleWeekday}
                 selectEveryDay={selectEveryDay}
+                monthDay={monthDay}
+                onMonthDayChange={onMonthDayChange}
                 endType={endType}
                 onEndTypeChange={onEndTypeChange}
                 occurrenceCount={occurrenceCount}
@@ -104,9 +126,13 @@ export default function SeriesSchedulerFields({
 }
 
 function SeriesSchedulerBody({
+    recurrenceType,
+    onRecurrenceTypeChange,
     weekdays,
     toggleWeekday,
     selectEveryDay,
+    monthDay,
+    onMonthDayChange,
     endType,
     onEndTypeChange,
     occurrenceCount,
@@ -114,9 +140,13 @@ function SeriesSchedulerBody({
     endDate,
     onEndDateChange,
 }: {
+    recurrenceType: RecurrenceType;
+    onRecurrenceTypeChange: (type: RecurrenceType) => void;
     weekdays: number[];
     toggleWeekday: (day: number) => void;
     selectEveryDay: () => void;
+    monthDay: number;
+    onMonthDayChange: (day: number) => void;
     endType: SeriesEndType;
     onEndTypeChange: (endType: SeriesEndType) => void;
     occurrenceCount: number;
@@ -126,28 +156,69 @@ function SeriesSchedulerBody({
 }) {
     return (
         <>
-            <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                    <Label className="text-xs">Repeat on</Label>
-                    <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={selectEveryDay}>
-                        Every day
+            {/* Recurrence type toggle */}
+            <div className="space-y-1.5">
+                <Label className="text-xs">Recurrence</Label>
+                <div className="flex gap-1.5">
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant={recurrenceType === "weekly" ? "default" : "outline"}
+                        className="flex-1 h-8 text-xs"
+                        onClick={() => onRecurrenceTypeChange("weekly")}
+                    >
+                        Weekly
+                    </Button>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant={recurrenceType === "monthly" ? "default" : "outline"}
+                        className="flex-1 h-8 text-xs"
+                        onClick={() => onRecurrenceTypeChange("monthly")}
+                    >
+                        Monthly
                     </Button>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                    {WEEKDAY_LABELS.map((label, day) => (
-                        <Button
-                            key={label}
-                            type="button"
-                            size="sm"
-                            variant={weekdays.includes(day) ? "default" : "outline"}
-                            className="h-8 min-w-10 px-2 text-xs"
-                            onClick={() => toggleWeekday(day)}
-                        >
-                            {label}
-                        </Button>
-                    ))}
-                </div>
             </div>
+
+            {recurrenceType === "weekly" ? (
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <Label className="text-xs">Repeat on</Label>
+                        <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={selectEveryDay}>
+                            Every day
+                        </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {WEEKDAY_LABELS.map((label, day) => (
+                            <Button
+                                key={label}
+                                type="button"
+                                size="sm"
+                                variant={weekdays.includes(day) ? "default" : "outline"}
+                                className="h-8 min-w-10 px-2 text-xs"
+                                onClick={() => toggleWeekday(day)}
+                            >
+                                {label}
+                            </Button>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div className="space-y-1.5">
+                    <Label htmlFor="monthDay" className="text-xs">Day of month</Label>
+                    <Input
+                        id="monthDay"
+                        type="number"
+                        min={1}
+                        max={31}
+                        value={monthDay}
+                        onChange={(e) => onMonthDayChange(Math.min(31, Math.max(1, Number(e.target.value) || 1)))}
+                        placeholder="e.g. 5"
+                    />
+                    <p className="text-xs text-muted-foreground">Months without this date (e.g. Feb 30) will be skipped.</p>
+                </div>
+            )}
 
             <div className="space-y-2">
                 <Label className="text-xs">Ends</Label>

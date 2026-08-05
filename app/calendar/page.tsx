@@ -77,7 +77,9 @@ export default function CalendarPage() {
     const [editScope, setEditScope] = useState<"choose" | "individual" | "series" | null>(null);
     const [editingSeries, setEditingSeries] = useState<TaskSeries | null>(null);
     const [isSeriesEnabled, setIsSeriesEnabled] = useState(false);
+    const [seriesRecurrenceType, setSeriesRecurrenceType] = useState<"weekly" | "monthly">("weekly");
     const [seriesWeekdays, setSeriesWeekdays] = useState<number[]>(DEFAULT_SERIES_WEEKDAYS);
+    const [seriesMonthDay, setSeriesMonthDay] = useState<number>(1);
     const [seriesEndType, setSeriesEndType] = useState<SeriesEndType>("count");
     const [seriesOccurrenceCount, setSeriesOccurrenceCount] = useState(30);
     const [seriesEndDate, setSeriesEndDate] = useState("");
@@ -332,13 +334,17 @@ export default function CalendarPage() {
                     assignee: updates.assignee,
                     priority: updates.priority,
                     columnId: editingSeries.column_id,
+                    recurrenceType: seriesRecurrenceType,
                     weekdays: seriesWeekdays,
+                    monthDay: seriesMonthDay,
                     startDate: editingSeries.start_date,
                     endType: seriesEndType,
                     occurrenceCount: seriesOccurrenceCount,
                     endDate: seriesEndDate || null,
                     scheduleChanged:
+                        seriesRecurrenceType !== (editingSeries.recurrence_type ?? "weekly") ||
                         JSON.stringify(seriesWeekdays) !== JSON.stringify(editingSeries.weekdays) ||
+                        seriesMonthDay !== (editingSeries.month_day ?? 1) ||
                         seriesEndType !== editingSeries.end_type ||
                         seriesOccurrenceCount !== (editingSeries.occurrence_count ?? 30) ||
                         (seriesEndDate || null) !== (editingSeries.end_date ?? null),
@@ -363,7 +369,7 @@ export default function CalendarPage() {
         setFormError(null);
         try {
             if (isSeriesEnabled && showSeriesFields) {
-                if (seriesWeekdays.length === 0) {
+                if (seriesRecurrenceType === "weekly" && seriesWeekdays.length === 0) {
                     setFormError("Select at least one weekday for the series.");
                     return;
                 }
@@ -377,7 +383,9 @@ export default function CalendarPage() {
                     description: formDescription.trim() || null,
                     assignee: formAssignee.trim() || null,
                     priority: formPriority,
+                    recurrenceType: seriesRecurrenceType,
                     weekdays: seriesWeekdays,
+                    monthDay: seriesMonthDay,
                     startDate: createTargetDate,
                     endType: seriesEndType,
                     occurrenceCount: seriesOccurrenceCount,
@@ -475,7 +483,7 @@ export default function CalendarPage() {
                     }}
                     className={`mt-0.5 transition-colors flex-shrink-0 ${
                         isMonthDesktop ? "" : "sm:scale-110"
-                    } ${isFinished ? styles.accent : "text-gray-400 hover:text-blue-600"}`}
+                    } ${isFinished ? styles.accent : "text-muted-foreground hover:text-blue-600"}`}
                 >
                     {isFinished ? (
                         <CheckSquare className={isMonthDesktop ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5.5 sm:w-5.5"} />
@@ -531,11 +539,11 @@ export default function CalendarPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col">
+            <div className="min-h-screen bg-background flex flex-col">
                 <Navbar />
                 <div className="flex-1 flex flex-col items-center justify-center">
-                    <Loader2 className="h-10 w-10 text-blue-600 animate-spin mb-4" />
-                    <p className="text-gray-500 font-medium">Loading calendar...</p>
+                    <Loader2 className="h-10 w-10 text-teal-500 animate-spin mb-4" />
+                    <p className="text-muted-foreground font-medium">Loading calendar...</p>
                 </div>
             </div>
         );
@@ -543,7 +551,7 @@ export default function CalendarPage() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col">
+            <div className="min-h-screen bg-background flex flex-col">
                 <Navbar />
                 <div className="flex-1 flex flex-col items-center justify-center p-4">
                     <div className="bg-red-50 border border-red-200 rounded-2xl p-6 max-w-md text-center">
@@ -573,16 +581,16 @@ export default function CalendarPage() {
 
         return (
             <div className="flex-1 flex flex-col min-h-0">
-                <div className="flex-1 flex flex-col bg-white rounded-2xl border shadow-xs overflow-hidden">
+                <div className="flex-1 flex flex-col bg-card rounded-2xl border shadow-xs overflow-hidden">
                     {/* Weekday headers */}
-                    <div className="grid grid-cols-7 border-b bg-slate-50/50 text-center font-semibold text-xs text-gray-500 uppercase tracking-wider py-3">
+                    <div className="grid grid-cols-7 border-b bg-muted/50 text-center font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
                         {weekdays.map((day) => (
                             <div key={day}>{day}</div>
                         ))}
                     </div>
 
                     {/* Day Cells Grid */}
-                    <div className="grid grid-cols-7 flex-grow divide-x divide-y divide-slate-100 bg-slate-50/20">
+                    <div className="grid grid-cols-7 flex-grow divide-x divide-y divide-border bg-muted/20">
                         {days.map((day, idx) => {
                             const dateStr = formatDateKey(day);
                             const isCurrentMonth = day.getMonth() === currentDate.getMonth();
@@ -599,7 +607,7 @@ export default function CalendarPage() {
                                     onDragLeave={handleDragLeave}
                                     onDrop={(e) => handleDrop(e, dateStr)}
                                     className={`min-h-[60px] sm:min-h-[120px] p-1 sm:p-2 flex flex-col space-y-1 transition-all cursor-pointer ${
-                                        isCurrentMonth ? "bg-white" : "bg-gray-50/50 text-gray-400"
+                                        isCurrentMonth ? "bg-card" : "bg-background text-muted-foreground"
                                     } ${isToday ? "bg-blue-50/20" : ""} ${
                                         isSelected ? "ring-2 ring-blue-600 ring-inset bg-blue-50/30" : ""
                                     } ${
@@ -611,7 +619,7 @@ export default function CalendarPage() {
                                             className={`text-[10px] sm:text-xs font-bold h-5 w-5 sm:h-6 sm:w-6 rounded-full flex items-center justify-center ${
                                                 isToday 
                                                     ? "bg-blue-600 text-white shadow-xs" 
-                                                    : isCurrentMonth ? "text-gray-700" : "text-gray-400"
+                                                    : isCurrentMonth ? "text-foreground" : "text-muted-foreground"
                                             }`}
                                         >
                                             {day.getDate()}
@@ -621,7 +629,7 @@ export default function CalendarPage() {
                                                 e.stopPropagation();
                                                 openCreateDialog(dateStr);
                                             }}
-                                            className="h-5 w-5 rounded-md hover:bg-slate-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors hidden sm:flex"
+                                            className="h-5 w-5 rounded-md hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors hidden sm:flex"
                                             title="Add task to this date"
                                         >
                                             <Plus className="h-3.5 w-3.5" />
@@ -644,7 +652,7 @@ export default function CalendarPage() {
                                             );
                                         })}
                                         {dateTasks.length > 3 && (
-                                            <span className="text-[8px] leading-none font-bold text-gray-500">+</span>
+                                            <span className="text-[8px] leading-none font-bold text-muted-foreground">+</span>
                                         )}
                                     </div>
                                 </div>
@@ -654,9 +662,9 @@ export default function CalendarPage() {
                 </div>
 
                 {/* Mobile Tasks List for the Selected Day */}
-                <div className="block sm:hidden mt-4 bg-white rounded-2xl border shadow-xs p-4">
+                <div className="block sm:hidden mt-4 bg-card rounded-2xl border shadow-xs p-4">
                     <div className="flex items-center justify-between border-b pb-2 mb-3">
-                        <h3 className="font-bold text-gray-800 text-sm">
+                        <h3 className="font-bold text-foreground text-sm">
                             Tasks for {currentDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                         </h3>
                         <Button 
@@ -669,7 +677,7 @@ export default function CalendarPage() {
                     </div>
                     <div className="space-y-2 max-h-[250px] overflow-y-auto">
                         {getTasksForDate(formatDateKey(currentDate)).length === 0 ? (
-                            <p className="text-xs text-gray-400 text-center py-4">No tasks scheduled for this day.</p>
+                            <p className="text-xs text-muted-foreground text-center py-4">No tasks scheduled for this day.</p>
                         ) : (
                             getTasksForDate(formatDateKey(currentDate)).map(t => renderTaskItem(t, false))
                         )}
@@ -684,7 +692,7 @@ export default function CalendarPage() {
         const todayStr = formatDateKey(new Date());
 
         return (
-            <div className="flex-1 flex flex-col md:flex-row bg-slate-50 md:bg-white rounded-2xl border md:border shadow-xs overflow-hidden md:divide-x divide-slate-100 space-y-3 md:space-y-0 p-3 md:p-0">
+            <div className="flex-1 flex flex-col md:flex-row bg-muted md:bg-card rounded-2xl border md:border shadow-xs overflow-hidden md:divide-x divide-border space-y-3 md:space-y-0 p-3 md:p-0">
                 {days.map((day, idx) => {
                     const dateStr = formatDateKey(day);
                     const isToday = dateStr === todayStr;
@@ -697,24 +705,24 @@ export default function CalendarPage() {
                             onDragOver={(e) => handleDragOver(e, dateStr)}
                             onDragLeave={handleDragLeave}
                             onDrop={(e) => handleDrop(e, dateStr)}
-                            className={`flex-1 flex flex-col p-2.5 sm:px-2 sm:py-3.5 space-y-2.5 min-h-0 md:min-h-[450px] transition-all rounded-xl md:rounded-none border md:border-0 bg-white ${
+                            className={`flex-1 flex flex-col p-2.5 sm:px-2 sm:py-3.5 space-y-2.5 min-h-0 md:min-h-[450px] transition-all rounded-xl md:rounded-none border md:border-0 bg-card ${
                                 isToday ? "bg-blue-50/15 border-blue-200" : "border-slate-100"
                             } ${isOver ? "ring-2 ring-blue-500 ring-inset bg-blue-50/40" : ""}`}
                         >
                             <div className="flex items-center justify-between border-b pb-2">
                                 <div className="flex md:flex-col items-center md:items-start space-x-2 md:space-x-0">
-                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                                         {day.toLocaleDateString("en-US", { weekday: "short" })}
                                     </p>
                                     <p className={`text-sm md:text-xl font-bold md:mt-0.5 h-6 w-6 md:h-8 md:w-8 rounded-full flex items-center justify-center ${
-                                        isToday ? "bg-blue-600 text-white shadow-xs" : "text-gray-800"
+                                        isToday ? "bg-blue-600 text-white shadow-xs" : "text-foreground"
                                     }`}>
                                         {day.getDate()}
                                     </p>
                                 </div>
                                 <button
                                     onClick={() => openCreateDialog(dateStr)}
-                                    className="h-6 w-6 rounded-md hover:bg-slate-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors"
+                                    className="h-6 w-6 rounded-md hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                                     title="Add task to this date"
                                 >
                                     <Plus className="h-4 w-4" />
@@ -722,7 +730,7 @@ export default function CalendarPage() {
                             </div>
                             <div className="flex-1 space-y-2">
                                 {dateTasks.length === 0 ? (
-                                    <p className="text-xs text-gray-400 text-center py-2 md:hidden">No tasks</p>
+                                    <p className="text-xs text-muted-foreground text-center py-2 md:hidden">No tasks</p>
                                 ) : (
                                     dateTasks.map(t => renderTaskItem(t, false))
                                 )}
@@ -742,27 +750,27 @@ export default function CalendarPage() {
         const isOver = dragOverDate === dateStr;
 
         return (
-            <div className="flex-1 flex justify-center bg-slate-50/30 p-4 sm:p-6">
+            <div className="flex-1 flex justify-center bg-muted/30 p-4 sm:p-6">
                 <div 
                     onDragOver={(e) => handleDragOver(e, dateStr)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, dateStr)}
-                    className={`w-full max-w-2xl bg-white rounded-2xl border shadow-sm p-6 flex flex-col space-y-4 transition-all min-h-[400px] ${
+                    className={`w-full max-w-2xl bg-card rounded-2xl border shadow-sm p-6 flex flex-col space-y-4 transition-all min-h-[400px] ${
                         isOver ? "ring-2 ring-blue-500 bg-blue-50/20" : ""
                     }`}
                 >
                     <div className="flex items-center justify-between border-b pb-3">
                         <div className="flex items-center space-x-3">
                             <span className={`text-2xl font-bold h-10 w-10 rounded-full flex items-center justify-center ${
-                                isToday ? "bg-blue-600 text-white shadow-xs" : "bg-slate-100 text-gray-800"
+                                isToday ? "bg-blue-600 text-white shadow-xs" : "bg-muted text-foreground"
                             }`}>
                                 {currentDate.getDate()}
                             </span>
                             <div>
-                                <h3 className="font-bold text-gray-800">
+                                <h3 className="font-bold text-foreground">
                                     {currentDate.toLocaleDateString("en-US", { weekday: "long" })}
                                 </h3>
-                                <p className="text-xs text-gray-500">{currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
+                                <p className="text-xs text-muted-foreground">{currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
                             </div>
                         </div>
                         <Button onClick={() => openCreateDialog(dateStr)} size="sm">
@@ -771,7 +779,7 @@ export default function CalendarPage() {
                     </div>
                     <div className="flex-1 overflow-y-auto space-y-2.5">
                         {dateTasks.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-center py-12 text-gray-400">
+                            <div className="h-full flex flex-col items-center justify-center text-center py-12 text-muted-foreground">
                                 <ListTodo className="h-10 w-10 mb-2 stroke-1" />
                                 <p className="text-sm font-medium">No tasks scheduled for today.</p>
                                 <p className="text-xs mt-1">Drag tasks here or click Add Task to get started.</p>
@@ -786,7 +794,7 @@ export default function CalendarPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50/50 flex flex-col">
+        <div className="min-h-screen bg-background flex flex-col">
             <Navbar />
             <main style={{ maxWidth: "1650px", width: "95%" }} className="mx-auto px-4 py-6 sm:py-8 flex-1 flex flex-col">
                 
@@ -795,18 +803,18 @@ export default function CalendarPage() {
                     
                     {/* Navigation Controls */}
                     <div className="flex items-center space-x-2 sm:space-x-4">
-                        <div className="flex items-center space-x-1 rounded-lg bg-white border p-1 shadow-xs">
+                        <div className="flex items-center space-x-1 rounded-lg bg-card border p-1 shadow-xs">
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigateCalendar("prev")}>
                                 <ChevronLeft className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="text-xs px-2.5 h-8 font-semibold text-gray-700" onClick={navigateToToday}>
+                            <Button variant="ghost" size="sm" className="text-xs px-2.5 h-8 font-semibold text-foreground" onClick={navigateToToday}>
                                 Today
                             </Button>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigateCalendar("next")}>
                                 <ChevronRight className="h-4 w-4" />
                             </Button>
                         </div>
-                        <h2 className="text-lg sm:text-xl font-bold text-gray-800 truncate select-none">
+                        <h2 className="text-lg sm:text-xl font-bold text-foreground truncate select-none">
                             {getHeaderDateString()}
                         </h2>
                     </div>
@@ -818,7 +826,7 @@ export default function CalendarPage() {
                         <Button 
                             variant="outline" 
                             size="sm" 
-                            className={`shadow-xs text-xs font-semibold ${!showCompleted ? "bg-slate-100 border-slate-200" : ""}`}
+                            className={`shadow-xs text-xs font-semibold ${!showCompleted ? "bg-muted border-slate-200" : ""}`}
                             onClick={() => setShowCompleted(!showCompleted)}
                         >
                             {showCompleted ? (
@@ -835,7 +843,7 @@ export default function CalendarPage() {
                         </Button>
 
                         {/* View Switcher */}
-                        <div className="flex items-center space-x-1 rounded-lg bg-white border p-1 shadow-xs">
+                        <div className="flex items-center space-x-1 rounded-lg bg-card border p-1 shadow-xs">
                             {(["day", "week", "month"] as ViewMode[]).map((mode) => (
                                 <Button
                                     key={mode}
@@ -858,10 +866,10 @@ export default function CalendarPage() {
 
                 {/* Calendar Grid Container */}
                 {boards.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-white border rounded-2xl shadow-xs py-16">
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-card border rounded-2xl shadow-xs py-16">
                         <Layers className="h-12 w-12 text-slate-300 stroke-1 mb-4" />
-                        <h3 className="font-bold text-gray-800 text-lg mb-1">No Boards Found</h3>
-                        <p className="text-gray-500 text-sm max-w-sm mb-6">
+                        <h3 className="font-bold text-foreground text-lg mb-1">No Boards Found</h3>
+                        <p className="text-muted-foreground text-sm max-w-sm mb-6">
                             To schedule tasks on your calendar, you need to create a project board first.
                         </p>
                         <Button onClick={() => window.location.href = "/dashboard"}>Go to Dashboard</Button>
@@ -880,7 +888,7 @@ export default function CalendarPage() {
                 <DialogContent className="w-[95vw] max-w-[450px] mx-auto">
                     <DialogHeader>
                         <DialogTitle>Add Task to Calendar</DialogTitle>
-                        <p className="text-sm text-gray-500">Create a task for your calendar</p>
+                        <p className="text-sm text-muted-foreground">Create a task for your calendar</p>
                     </DialogHeader>
                     <form className="space-y-4" onSubmit={handleCreateTask}>
                         {formError && (
@@ -1005,8 +1013,12 @@ export default function CalendarPage() {
                             <SeriesSchedulerFields
                                 enabled={isSeriesEnabled}
                                 onEnabledChange={setIsSeriesEnabled}
+                                recurrenceType={seriesRecurrenceType}
+                                onRecurrenceTypeChange={setSeriesRecurrenceType}
                                 weekdays={seriesWeekdays}
                                 onWeekdaysChange={setSeriesWeekdays}
+                                monthDay={seriesMonthDay}
+                                onMonthDayChange={setSeriesMonthDay}
                                 endType={seriesEndType}
                                 onEndTypeChange={setSeriesEndType}
                                 occurrenceCount={seriesOccurrenceCount}
@@ -1023,7 +1035,7 @@ export default function CalendarPage() {
                             </Button>
                             <Button 
                                 type="submit" 
-                                disabled={!formTitle.trim() || !formColumnId || formSubmitting || (isSeriesEnabled && showSeriesFields && seriesWeekdays.length === 0)}
+                                disabled={!formTitle.trim() || !formColumnId || formSubmitting || (isSeriesEnabled && showSeriesFields && seriesRecurrenceType === "weekly" && seriesWeekdays.length === 0)}
                             >
                                 {formSubmitting ? "Adding..." : isSeriesEnabled && showSeriesFields ? "Create Series" : "Add Task"}
                             </Button>
@@ -1039,7 +1051,7 @@ export default function CalendarPage() {
                         <>
                             <DialogHeader>
                                 <DialogTitle>Edit Recurring Task</DialogTitle>
-                                <p className="text-sm text-gray-600">This task belongs to a series. What would you like to edit?</p>
+                                <p className="text-sm text-muted-foreground">This task belongs to a series. What would you like to edit?</p>
                             </DialogHeader>
                             <div className="space-y-3 pt-2">
                                 <Button className="w-full justify-start" onClick={() => setEditScope("individual")}>
@@ -1058,7 +1070,7 @@ export default function CalendarPage() {
                         <>
                             <DialogHeader>
                                 <DialogTitle>{editScope === "series" ? "Edit Series" : "Edit Task"}</DialogTitle>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-muted-foreground">
                                     {editScope === "series" ? "Update the recurring schedule and task details" : "Update task details"}
                                 </p>
                             </DialogHeader>
@@ -1122,8 +1134,12 @@ export default function CalendarPage() {
                                     <SeriesSchedulerFields
                                         enabled
                                         showToggle={false}
+                                        recurrenceType={seriesRecurrenceType}
+                                        onRecurrenceTypeChange={setSeriesRecurrenceType}
                                         weekdays={seriesWeekdays}
                                         onWeekdaysChange={setSeriesWeekdays}
+                                        monthDay={seriesMonthDay}
+                                        onMonthDayChange={setSeriesMonthDay}
                                         endType={seriesEndType}
                                         onEndTypeChange={setSeriesEndType}
                                         occurrenceCount={seriesOccurrenceCount}

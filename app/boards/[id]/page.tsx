@@ -238,7 +238,9 @@ export default function BoardPage() {
     const [editScope, setEditScope] = useState<"choose" | "individual" | "series" | null>(null);
     const [editingSeries, setEditingSeries] = useState<TaskSeries | null>(null);
     const [isSeriesEnabled, setIsSeriesEnabled] = useState(false);
+    const [seriesRecurrenceType, setSeriesRecurrenceType] = useState<"weekly" | "monthly">("weekly");
     const [seriesWeekdays, setSeriesWeekdays] = useState<number[]>(DEFAULT_SERIES_WEEKDAYS);
+    const [seriesMonthDay, setSeriesMonthDay] = useState(1);
     const [seriesEndType, setSeriesEndType] = useState<SeriesEndType>("count");
     const [seriesOccurrenceCount, setSeriesOccurrenceCount] = useState(30);
     const [seriesEndDate, setSeriesEndDate] = useState("");
@@ -247,7 +249,9 @@ export default function BoardPage() {
     const isRepetitiveBoard = isRepetitiveTasksBoard(board);
 
     function resetSeriesFields() {
+        setSeriesRecurrenceType("weekly");
         setSeriesWeekdays(DEFAULT_SERIES_WEEKDAYS);
+        setSeriesMonthDay(new Date().getDate());
         setSeriesEndType("count");
         setSeriesOccurrenceCount(30);
         setSeriesEndDate("");
@@ -267,8 +271,12 @@ export default function BoardPage() {
             <SeriesSchedulerFields
                 enabled={isSeriesEnabled}
                 onEnabledChange={setIsSeriesEnabled}
+                recurrenceType={seriesRecurrenceType}
+                onRecurrenceTypeChange={setSeriesRecurrenceType}
                 weekdays={seriesWeekdays}
                 onWeekdaysChange={setSeriesWeekdays}
+                monthDay={seriesMonthDay}
+                onMonthDayChange={setSeriesMonthDay}
                 endType={seriesEndType}
                 onEndTypeChange={setSeriesEndType}
                 occurrenceCount={seriesOccurrenceCount}
@@ -324,7 +332,9 @@ export default function BoardPage() {
             const series = await getTaskSeries(task.series_id);
             setEditingSeries(series);
             setEditScope("series");
+            setSeriesRecurrenceType(series.recurrence_type ?? "weekly");
             setSeriesWeekdays(series.weekdays);
+            setSeriesMonthDay(series.month_day ?? new Date().getDate());
             setSeriesEndType(series.end_type);
             setSeriesOccurrenceCount(series.occurrence_count ?? 30);
             setSeriesEndDate(series.end_date ?? "");
@@ -381,7 +391,7 @@ export default function BoardPage() {
         if (!targetColumn) throw new Error("No column available to add task");
 
         if (isRepetitiveBoard && isSeriesEnabled) {
-            if (seriesWeekdays.length === 0) throw new Error("Select at least one weekday for the series.");
+            if (seriesRecurrenceType === "weekly" && seriesWeekdays.length === 0) throw new Error("Select at least one weekday for the series.");
             if (seriesEndType === "until" && !seriesEndDate) throw new Error("Select an end date for the series.");
             const startDate = seriesStartDate || taskData.dueDate || new Date().toISOString().slice(0, 10);
             await createTaskSeries({
@@ -390,7 +400,9 @@ export default function BoardPage() {
                 description: taskData.description || null,
                 assignee: taskData.assignee || null,
                 priority: taskData.priority,
+                recurrenceType: seriesRecurrenceType,
                 weekdays: seriesWeekdays,
+                monthDay: seriesMonthDay,
                 startDate,
                 endType: seriesEndType,
                 occurrenceCount: seriesOccurrenceCount,
@@ -827,8 +839,12 @@ export default function BoardPage() {
                                     <SeriesSchedulerFields
                                         enabled
                                         showToggle={false}
+                                        recurrenceType={seriesRecurrenceType}
+                                        onRecurrenceTypeChange={setSeriesRecurrenceType}
                                         weekdays={seriesWeekdays}
                                         onWeekdaysChange={setSeriesWeekdays}
+                                        monthDay={seriesMonthDay}
+                                        onMonthDayChange={setSeriesMonthDay}
                                         endType={seriesEndType}
                                         onEndTypeChange={setSeriesEndType}
                                         occurrenceCount={seriesOccurrenceCount}

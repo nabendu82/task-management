@@ -353,14 +353,16 @@ export const seriesService = {
     ): Promise<{ series: TaskSeries; tasks: Task[] }> {
         const occurrenceDates = generateOccurrenceDates({
             startDate: input.startDate,
+            recurrenceType: input.recurrenceType,
             weekdays: input.weekdays,
+            monthDay: input.monthDay,
             endType: input.endType,
             occurrenceCount: input.occurrenceCount,
             endDate: input.endDate || undefined,
         });
 
         if (occurrenceDates.length === 0) {
-            throw new Error("No occurrences generated. Check weekdays and end settings.");
+            throw new Error("No occurrences generated. Check recurrence settings.");
         }
 
         const { data: series, error: seriesError } = await supabase
@@ -372,7 +374,9 @@ export const seriesService = {
                 description: input.description || null,
                 assignee: input.assignee || null,
                 priority: input.priority || "medium",
-                weekdays: input.weekdays,
+                recurrence_type: input.recurrenceType,
+                weekdays: input.recurrenceType === "weekly" ? input.weekdays : [],
+                month_day: input.recurrenceType === "monthly" ? (input.monthDay ?? null) : null,
                 start_date: input.startDate,
                 end_type: input.endType,
                 occurrence_count: input.endType === "count" ? input.occurrenceCount ?? null : null,
@@ -405,14 +409,18 @@ export const seriesService = {
     ): Promise<{ series: TaskSeries; tasks: Task[] }> {
         const existing = await seriesService.getSeries(supabase, seriesId);
 
+        const nextRecurrenceType = input.recurrenceType ?? existing.recurrence_type ?? "weekly";
         const nextWeekdays = input.weekdays ?? existing.weekdays;
+        const nextMonthDay = input.monthDay ?? existing.month_day ?? undefined;
         const nextStartDate = input.startDate ?? existing.start_date;
         const nextEndType = input.endType ?? existing.end_type;
         const nextOccurrenceCount = input.occurrenceCount ?? existing.occurrence_count ?? undefined;
         const nextEndDate = input.endDate ?? existing.end_date ?? undefined;
 
         const scheduleChanged = input.scheduleChanged || (
+            input.recurrenceType !== undefined ||
             input.weekdays !== undefined ||
+            input.monthDay !== undefined ||
             input.startDate !== undefined ||
             input.endType !== undefined ||
             input.occurrenceCount !== undefined ||
@@ -428,7 +436,9 @@ export const seriesService = {
         if (input.assignee !== undefined) seriesUpdates.assignee = input.assignee;
         if (input.priority !== undefined) seriesUpdates.priority = input.priority;
         if (input.columnId !== undefined) seriesUpdates.column_id = input.columnId;
+        if (input.recurrenceType !== undefined) seriesUpdates.recurrence_type = input.recurrenceType;
         if (input.weekdays !== undefined) seriesUpdates.weekdays = input.weekdays;
+        if (input.monthDay !== undefined) seriesUpdates.month_day = input.monthDay;
         if (input.startDate !== undefined) seriesUpdates.start_date = input.startDate;
         if (input.endType !== undefined) seriesUpdates.end_type = input.endType;
         if (input.occurrenceCount !== undefined) seriesUpdates.occurrence_count = input.occurrenceCount;
@@ -448,7 +458,9 @@ export const seriesService = {
 
             const occurrenceDates = generateOccurrenceDates({
                 startDate: nextStartDate,
+                recurrenceType: nextRecurrenceType,
                 weekdays: nextWeekdays,
+                monthDay: nextMonthDay,
                 endType: nextEndType,
                 occurrenceCount: nextOccurrenceCount,
                 endDate: nextEndDate || undefined,

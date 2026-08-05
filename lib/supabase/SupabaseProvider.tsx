@@ -19,13 +19,19 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
     const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
     useEffect(() => {
-        if (!session) return;
         const client = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                accessToken: () => session?.getToken(),
-            }
+            session ? {
+                accessToken: async () => {
+                    try {
+                        const token = await session.getToken();
+                        return token ?? "";
+                    } catch {
+                        return "";
+                    }
+                },
+            } : undefined
         );
         setSupabase(client);
         setIsLoaded(true);
